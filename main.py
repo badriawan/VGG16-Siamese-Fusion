@@ -1507,11 +1507,7 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
         traceback.print_exc()
         return None
 
-# Run this in Google Colab
-if __name__ == "__main__":
-    print("MultiModal Corrosion Analyzer - Google Colab Version")
-    print("Run quick_test() first, then train_complete_system()")
-    print("After training, use evaluate_and_visualize_results() for comprehensive evaluation")
+
 
 
 
