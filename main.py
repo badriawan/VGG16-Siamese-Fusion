@@ -605,6 +605,90 @@ class MultiModalCorrosionAnalyzer:
         plt.show()
         return fig
 
+    def plot_siamese_training_curves(self, training_history, save_path=None):
+        """Plot Siamese-specific training curves"""
+        print("Creating Siamese training curves visualization...")
+        
+        fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle('Siamese Networks Training Progress', fontsize=16, fontweight='bold')
+        
+        # Extract data
+        epochs = range(1, len(training_history['train_losses']) + 1)
+        
+        # Training Loss
+        axes[0, 0].plot(epochs, training_history['train_losses'], 'b-', linewidth=2, label='Training Loss')
+        if 'val_losses' in training_history and len(training_history['val_losses']) > 0:
+            val_epochs = range(1, len(training_history['val_losses']) + 1)
+            if len(val_epochs) == len(epochs):
+                axes[0, 0].plot(epochs, training_history['val_losses'], 'r--', linewidth=2, label='Validation Loss')
+            else:
+                axes[0, 0].plot(val_epochs, training_history['val_losses'], 'r--', linewidth=2, label='Validation Loss')
+        axes[0, 0].set_title('Contrastive Loss Curves', fontweight='bold')
+        axes[0, 0].set_xlabel('Epoch')
+        axes[0, 0].set_ylabel('Contrastive Loss')
+        axes[0, 0].legend()
+        axes[0, 0].grid(True, alpha=0.3)
+        
+        # Modality-specific losses
+        if 'modality_losses' in training_history:
+            modality_data = training_history['modality_losses']
+            for modality, losses in modality_data.items():
+                if len(losses) > 0:
+                    if len(losses) == len(epochs):
+                        axes[0, 1].plot(epochs, losses, linewidth=2, label=f'{modality.upper()} Loss')
+                    else:
+                        modality_epochs = range(1, len(losses) + 1)
+                        axes[0, 1].plot(modality_epochs, losses, linewidth=2, label=f'{modality.upper()} Loss')
+            axes[0, 1].set_title('Modality-Specific Losses', fontweight='bold')
+            axes[0, 1].set_xlabel('Epoch')
+            axes[0, 1].set_ylabel('Loss')
+            axes[0, 1].legend()
+            axes[0, 1].grid(True, alpha=0.3)
+        else:
+            axes[0, 1].text(0.5, 0.5, 'No modality loss data', ha='center', va='center', 
+                           transform=axes[0, 1].transAxes, fontsize=12)
+            axes[0, 1].set_title('Modality-Specific Losses', fontweight='bold')
+        
+        # Learning Rate
+        if 'learning_rates' in training_history and len(training_history['learning_rates']) > 0:
+            lr_epochs = range(1, len(training_history['learning_rates']) + 1)
+            if len(lr_epochs) == len(epochs):
+                axes[1, 0].plot(epochs, training_history['learning_rates'], 'purple', linewidth=2)
+            else:
+                axes[1, 0].plot(lr_epochs, training_history['learning_rates'], 'purple', linewidth=2)
+            axes[1, 0].set_title('Learning Rate Schedule', fontweight='bold')
+            axes[1, 0].set_xlabel('Epoch')
+            axes[1, 0].set_ylabel('Learning Rate')
+            axes[1, 0].grid(True, alpha=0.3)
+        else:
+            axes[1, 0].text(0.5, 0.5, 'No learning rate data', ha='center', va='center', 
+                           transform=axes[1, 0].transAxes, fontsize=12)
+            axes[1, 0].set_title('Learning Rate Schedule', fontweight='bold')
+        
+        # Training Info
+        info_text = f"Siamese Networks Training\n"
+        info_text += f"Total Epochs: {len(epochs)}\n"
+        info_text += f"Final Training Loss: {training_history['train_losses'][-1]:.4f}\n"
+        if 'modality_losses' in training_history:
+            for modality, losses in training_history['modality_losses'].items():
+                if len(losses) > 0:
+                    info_text += f"Final {modality.upper()} Loss: {losses[-1]:.4f}\n"
+        
+        axes[1, 1].text(0.5, 0.5, info_text, ha='center', va='center', 
+                        transform=axes[1, 1].transAxes, fontsize=12, 
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.7))
+        axes[1, 1].set_title('Training Summary', fontweight='bold')
+        axes[1, 1].axis('off')
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Siamese training curves plot saved to: {save_path}")
+        
+        plt.show()
+        return fig
+
     def analyze_dataset_structure(self, data_directory):
         """Analyze and display detailed dataset structure information"""
         print(f"\nAnalyzing dataset structure in: {data_directory}")
@@ -716,7 +800,7 @@ class MultiModalCorrosionAnalyzer:
         axes[0, 0].legend()
         axes[0, 0].grid(True, alpha=0.3)
         
-        # Accuracy
+        # Accuracy or Pair Accuracy
         if 'val_accuracies' in training_history and len(training_history['val_accuracies']) > 0:
             val_acc_epochs = range(1, len(training_history['val_accuracies']) + 1)
             if len(val_acc_epochs) == len(epochs):
@@ -728,10 +812,21 @@ class MultiModalCorrosionAnalyzer:
             axes[0, 1].set_ylabel('Accuracy')
             axes[0, 1].legend()
             axes[0, 1].grid(True, alpha=0.3)
+        elif 'pair_accuracy' in training_history and len(training_history['pair_accuracy']) > 0:
+            pair_acc_epochs = range(1, len(training_history['pair_accuracy']) + 1)
+            if len(pair_acc_epochs) == len(epochs):
+                axes[0, 1].plot(epochs, training_history['pair_accuracy'], 'g-', linewidth=2, label='Pair Accuracy')
+            else:
+                axes[0, 1].plot(pair_acc_epochs, training_history['pair_accuracy'], 'g-', linewidth=2, label='Pair Accuracy')
+            axes[0, 1].set_title('Siamese Pair Accuracy', fontweight='bold')
+            axes[0, 1].set_xlabel('Epoch')
+            axes[0, 1].set_ylabel('Pair Accuracy')
+            axes[0, 1].legend()
+            axes[0, 1].grid(True, alpha=0.3)
         else:
-            axes[0, 1].text(0.5, 0.5, 'No validation accuracy data', ha='center', va='center', 
+            axes[0, 1].text(0.5, 0.5, 'Siamese Networks: Loss-based training\n(No accuracy metrics)', ha='center', va='center', 
                            transform=axes[0, 1].transAxes, fontsize=12)
-            axes[0, 1].set_title('Accuracy Progress', fontweight='bold')
+            axes[0, 1].set_title('Siamese Training Info', fontweight='bold')
         
         # Learning Rate (if available)
         if 'learning_rates' in training_history and len(training_history['learning_rates']) > 0:
@@ -969,12 +1064,14 @@ class MultiModalCorrosionAnalyzer:
             'train_losses': [],
             'val_losses': [],
             'modality_losses': {'rgb': [], 'thermal': [], 'lidar': []},
-            'learning_rates': []
+            'learning_rates': [],
+            'pair_accuracy': []  # Add pair accuracy tracking
         }
 
         for epoch in range(epochs):
             total_loss = {'rgb': 0, 'thermal': 0, 'lidar': 0}
             processed_pairs = 0
+            correct_pairs = 0
 
             # Process in smaller batches to show progress
             for i in range(0, len(train_pairs), batch_size):
@@ -1554,10 +1651,17 @@ def safe_training():
             
             # Plot results
             try:
-                analyzer.plot_training_curves(results)
-                print("Visualization completed!")
+                # Use Siamese-specific visualization
+                analyzer.plot_siamese_training_curves(results)
+                print("Siamese training visualization completed!")
             except Exception as e:
                 print(f"Visualization error: {e}")
+                # Fallback to general visualization
+                try:
+                    analyzer.plot_training_curves(results)
+                    print("Fallback visualization completed!")
+                except Exception as e2:
+                    print(f"Fallback visualization also failed: {e2}")
         
         return analyzer, results
         
