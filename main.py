@@ -275,20 +275,52 @@ class MultiModalCorrosionAnalyzer:
                 except:
                     class_label = 0
 
-            # Group files by sample ID
+            # Group files by sample ID - handle nested structure
             samples = defaultdict(dict)
-            files = [f for f in os.listdir(class_path) if f.endswith('.png')]
-            print(f"  Found {len(files)} PNG files")
-
-            for file in files:
-                # Extract sample ID and modality
-                parts = file.split('_')
-                if len(parts) >= 3:
-                    sample_id = '_'.join(parts[:-1])
-                    modality = parts[-1].split('.')[0]
-
-                    if modality in ['rgb', 'thermal', 'lidar']:
-                        samples[sample_id][modality] = os.path.join(class_path, file)
+            
+            # Check if there are subdirectories (sample_1, sample_2, etc.)
+            subdirs = [d for d in os.listdir(class_path) if os.path.isdir(os.path.join(class_path, d))]
+            
+            if subdirs:
+                # Handle nested structure: class_dir/sample_X/files
+                print(f"  Found {len(subdirs)} sample subdirectories")
+                for subdir in subdirs:
+                    subdir_path = os.path.join(class_path, subdir)
+                    files = [f for f in os.listdir(subdir_path) if f.endswith('.png')]
+                    
+                    for file in files:
+                        # Handle different naming conventions
+                        if '_therm.png' in file:
+                            # Thermal image
+                            base_name = file.replace('_therm.png', '')
+                            samples[base_name]['thermal'] = os.path.join(subdir_path, file)
+                        elif '_depth.png' in file:
+                            # LiDAR depth image
+                            base_name = file.replace('_depth.png', '')
+                            samples[base_name]['lidar'] = os.path.join(subdir_path, file)
+                        elif file.endswith('.png') and not ('_therm' in file or '_depth' in file):
+                            # RGB image (default)
+                            base_name = file.replace('.png', '')
+                            samples[base_name]['rgb'] = os.path.join(subdir_path, file)
+            else:
+                # Handle flat structure: class_dir/files
+                files = [f for f in os.listdir(class_path) if f.endswith('.png')]
+                print(f"  Found {len(files)} PNG files in flat structure")
+                
+                for file in files:
+                    # Handle different naming conventions
+                    if '_therm.png' in file:
+                        # Thermal image
+                        base_name = file.replace('_therm.png', '')
+                        samples[base_name]['thermal'] = os.path.join(class_path, file)
+                    elif '_depth.png' in file:
+                        # LiDAR depth image
+                        base_name = file.replace('_depth.png', '')
+                        samples[base_name]['lidar'] = os.path.join(class_path, file)
+                    elif file.endswith('.png') and not ('_therm' in file or '_depth' in file):
+                        # RGB image (default)
+                        base_name = file.replace('.png', '')
+                        samples[base_name]['rgb'] = os.path.join(class_path, file)
 
             # Add complete samples to dataset
             class_count = 0
@@ -496,10 +528,28 @@ class MultiModalCorrosionAnalyzer:
             if not os.path.isdir(class_path):
                 continue
                 
-            # Count PNG files
-            png_files = [f for f in os.listdir(class_path) if f.endswith('.png')]
-            class_counts[class_dir] = len(png_files)
-            total_files += len(png_files)
+            # Count PNG files (handle nested structure)
+            png_count = 0
+            subdirs = [d for d in os.listdir(class_path) if os.path.isdir(os.path.join(class_path, d))]
+            
+            if subdirs:
+                # Count files in subdirectories
+                for subdir in subdirs:
+                    subdir_path = os.path.join(class_path, subdir)
+                    png_files = [f for f in os.listdir(subdir_path) if f.endswith('.png')]
+                    png_count += len(png_files)
+            else:
+                # Count files directly in class directory
+                png_files = [f for f in os.listdir(class_path) if f.endswith('.png')]
+                png_count = len(png_files)
+            
+            class_counts[class_dir] = png_count
+            total_files += png_count
+        
+        # Check if we have valid data
+        if not class_counts or sum(class_counts.values()) == 0:
+            print("Warning: No valid data found for visualization")
+            return None
         
         # Create visualization
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
@@ -509,22 +559,41 @@ class MultiModalCorrosionAnalyzer:
         counts = list(class_counts.values())
         colors = ['#2E8B57', '#FF6B6B', '#4ECDC4']
         
-        bars = ax1.bar(classes, counts, color=colors[:len(classes)], alpha=0.8)
-        ax1.set_title('Dataset Distribution by Class', fontweight='bold', fontsize=14)
-        ax1.set_xlabel('Class', fontweight='bold')
-        ax1.set_ylabel('Number of Samples', fontweight='bold')
-        ax1.tick_params(axis='x', rotation=45)
-        
-        # Add value labels on bars
-        for bar, count in zip(bars, counts):
-            height = bar.get_height()
-            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01*max(counts),
-                    f'{count}', ha='center', va='bottom', fontweight='bold')
+        if counts and max(counts) > 0:
+            bars = ax1.bar(classes, counts, color=colors[:len(classes)], alpha=0.8)
+            ax1.set_title('Dataset Distribution by Class', fontweight='bold', fontsize=14)
+            ax1.set_xlabel('Class', fontweight='bold')
+            ax1.set_ylabel('Number of Files', fontweight='bold')
+            ax1.tick_params(axis='x', rotation=45)
+            
+            # Add value labels on bars
+            for bar, count in zip(bars, counts):
+                height = bar.get_height()
+                ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01*max(counts),
+                        f'{count}', ha='center', va='bottom', fontweight='bold')
+        else:
+            ax1.text(0.5, 0.5, 'No data available', ha='center', va='center', 
+                    transform=ax1.transAxes, fontsize=14)
+            ax1.set_title('Dataset Distribution by Class', fontweight='bold', fontsize=14)
         
         # Pie chart
-        if counts:
-            wedges, texts, autotexts = ax2.pie(counts, labels=classes, autopct='%1.1f%%',
-                                               colors=colors[:len(classes)], startangle=90)
+        if counts and sum(counts) > 0:
+            # Filter out zero counts
+            non_zero_classes = [cls for cls, count in zip(classes, counts) if count > 0]
+            non_zero_counts = [count for count in counts if count > 0]
+            
+            if non_zero_counts:
+                wedges, texts, autotexts = ax2.pie(non_zero_counts, labels=non_zero_classes, 
+                                                   autopct='%1.1f%%',
+                                                   colors=colors[:len(non_zero_classes)], startangle=90)
+                ax2.set_title('Dataset Distribution (%)', fontweight='bold', fontsize=14)
+            else:
+                ax2.text(0.5, 0.5, 'No data available', ha='center', va='center', 
+                        transform=ax2.transAxes, fontsize=14)
+                ax2.set_title('Dataset Distribution (%)', fontweight='bold', fontsize=14)
+        else:
+            ax2.text(0.5, 0.5, 'No data available', ha='center', va='center', 
+                    transform=ax2.transAxes, fontsize=14)
             ax2.set_title('Dataset Distribution (%)', fontweight='bold', fontsize=14)
         
         plt.tight_layout()
@@ -535,6 +604,92 @@ class MultiModalCorrosionAnalyzer:
         
         plt.show()
         return fig
+
+    def analyze_dataset_structure(self, data_directory):
+        """Analyze and display detailed dataset structure information"""
+        print(f"\nAnalyzing dataset structure in: {data_directory}")
+        print("="*60)
+        
+        dataset_info = {
+            'classes': {},
+            'total_samples': 0,
+            'total_files': 0,
+            'modality_counts': {'rgb': 0, 'thermal': 0, 'lidar': 0}
+        }
+        
+        for class_dir in os.listdir(data_directory):
+            class_path = os.path.join(data_directory, class_dir)
+            if not os.path.isdir(class_path):
+                continue
+                
+            print(f"\nClass: {class_dir}")
+            print("-" * 40)
+            
+            # Check for subdirectories
+            subdirs = [d for d in os.listdir(class_path) if os.path.isdir(os.path.join(class_path, d))]
+            
+            if subdirs:
+                print(f"Found {len(subdirs)} sample subdirectories:")
+                class_samples = 0
+                class_files = 0
+                
+                for subdir in subdirs:
+                    subdir_path = os.path.join(class_path, subdir)
+                    files = [f for f in os.listdir(subdir_path) if f.endswith('.png')]
+                    
+                    rgb_files = [f for f in files if not ('_therm' in f or '_depth' in f)]
+                    thermal_files = [f for f in files if '_therm' in f]
+                    lidar_files = [f for f in files if '_depth' in f]
+                    
+                    print(f"  {subdir}: {len(files)} files")
+                    print(f"    RGB: {len(rgb_files)}, Thermal: {len(thermal_files)}, LiDAR: {len(lidar_files)}")
+                    
+                    if len(files) > 0:
+                        class_samples += 1
+                        class_files += len(files)
+                        
+                        dataset_info['modality_counts']['rgb'] += len(rgb_files)
+                        dataset_info['modality_counts']['thermal'] += len(thermal_files)
+                        dataset_info['modality_counts']['lidar'] += len(lidar_files)
+                
+                dataset_info['classes'][class_dir] = {
+                    'samples': class_samples,
+                    'files': class_files
+                }
+                dataset_info['total_samples'] += class_samples
+                dataset_info['total_files'] += class_files
+                
+            else:
+                # Flat structure
+                files = [f for f in os.listdir(class_path) if f.endswith('.png')]
+                rgb_files = [f for f in files if not ('_therm' in f or '_depth' in f)]
+                thermal_files = [f for f in files if '_therm' in f]
+                lidar_files = [f for f in files if '_depth' in f]
+                
+                print(f"Flat structure: {len(files)} files")
+                print(f"  RGB: {len(rgb_files)}, Thermal: {len(thermal_files)}, LiDAR: {len(lidar_files)}")
+                
+                dataset_info['classes'][class_dir] = {
+                    'samples': len(files) // 3 if len(files) > 0 else 0,  # Estimate
+                    'files': len(files)
+                }
+                dataset_info['total_files'] += len(files)
+                dataset_info['modality_counts']['rgb'] += len(rgb_files)
+                dataset_info['modality_counts']['thermal'] += len(thermal_files)
+                dataset_info['modality_counts']['lidar'] += len(lidar_files)
+        
+        # Print summary
+        print("\n" + "="*60)
+        print("DATASET SUMMARY")
+        print("="*60)
+        print(f"Total classes: {len(dataset_info['classes'])}")
+        print(f"Total samples: {dataset_info['total_samples']}")
+        print(f"Total files: {dataset_info['total_files']}")
+        print(f"\nModality distribution:")
+        for modality, count in dataset_info['modality_counts'].items():
+            print(f"  {modality.upper()}: {count} files")
+        
+        return dataset_info
 
     def plot_training_curves(self, training_history, save_path=None):
         """Plot training curves for paper"""
@@ -1353,8 +1508,18 @@ def quick_test():
         # Test dataset structure check
         data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
         if os.path.exists(data_directory):
-            analyzer.check_dataset_structure(data_directory)
-            print("✓ Dataset structure check completed")
+            # Analyze dataset structure
+            dataset_info = analyzer.analyze_dataset_structure(data_directory)
+            print("✓ Dataset analysis completed")
+            
+            # Test dataset preparation
+            train_data, val_data = analyzer.prepare_training_dataset(data_directory)
+            print(f"✓ Dataset preparation completed: {len(train_data)} train, {len(val_data)} val")
+            
+            # Test visualization
+            analyzer.visualize_dataset_distribution(data_directory)
+            print("✓ Dataset visualization completed")
+            
         else:
             print("⚠ Dataset directory not found, skipping dataset test")
 
