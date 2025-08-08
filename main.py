@@ -703,8 +703,13 @@ class MultiModalCorrosionAnalyzer:
         
         # Training Loss
         axes[0, 0].plot(epochs, training_history['train_losses'], 'b-', linewidth=2, label='Training Loss')
-        if 'val_losses' in training_history:
-            axes[0, 0].plot(epochs, training_history['val_losses'], 'r--', linewidth=2, label='Validation Loss')
+        if 'val_losses' in training_history and len(training_history['val_losses']) > 0:
+            # Ensure val_losses has same length as epochs
+            val_epochs = range(1, len(training_history['val_losses']) + 1)
+            if len(val_epochs) == len(epochs):
+                axes[0, 0].plot(epochs, training_history['val_losses'], 'r--', linewidth=2, label='Validation Loss')
+            else:
+                axes[0, 0].plot(val_epochs, training_history['val_losses'], 'r--', linewidth=2, label='Validation Loss')
         axes[0, 0].set_title('Loss Curves', fontweight='bold')
         axes[0, 0].set_xlabel('Epoch')
         axes[0, 0].set_ylabel('Loss')
@@ -712,32 +717,57 @@ class MultiModalCorrosionAnalyzer:
         axes[0, 0].grid(True, alpha=0.3)
         
         # Accuracy
-        if 'val_accuracies' in training_history:
-            axes[0, 1].plot(epochs, training_history['val_accuracies'], 'g-', linewidth=2, label='Validation Accuracy')
+        if 'val_accuracies' in training_history and len(training_history['val_accuracies']) > 0:
+            val_acc_epochs = range(1, len(training_history['val_accuracies']) + 1)
+            if len(val_acc_epochs) == len(epochs):
+                axes[0, 1].plot(epochs, training_history['val_accuracies'], 'g-', linewidth=2, label='Validation Accuracy')
+            else:
+                axes[0, 1].plot(val_acc_epochs, training_history['val_accuracies'], 'g-', linewidth=2, label='Validation Accuracy')
             axes[0, 1].set_title('Accuracy Progress', fontweight='bold')
             axes[0, 1].set_xlabel('Epoch')
             axes[0, 1].set_ylabel('Accuracy')
             axes[0, 1].legend()
             axes[0, 1].grid(True, alpha=0.3)
+        else:
+            axes[0, 1].text(0.5, 0.5, 'No validation accuracy data', ha='center', va='center', 
+                           transform=axes[0, 1].transAxes, fontsize=12)
+            axes[0, 1].set_title('Accuracy Progress', fontweight='bold')
         
         # Learning Rate (if available)
-        if 'learning_rates' in training_history:
-            axes[1, 0].plot(epochs, training_history['learning_rates'], 'purple', linewidth=2)
+        if 'learning_rates' in training_history and len(training_history['learning_rates']) > 0:
+            lr_epochs = range(1, len(training_history['learning_rates']) + 1)
+            if len(lr_epochs) == len(epochs):
+                axes[1, 0].plot(epochs, training_history['learning_rates'], 'purple', linewidth=2)
+            else:
+                axes[1, 0].plot(lr_epochs, training_history['learning_rates'], 'purple', linewidth=2)
             axes[1, 0].set_title('Learning Rate Schedule', fontweight='bold')
             axes[1, 0].set_xlabel('Epoch')
             axes[1, 0].set_ylabel('Learning Rate')
             axes[1, 0].grid(True, alpha=0.3)
+        else:
+            axes[1, 0].text(0.5, 0.5, 'No learning rate data', ha='center', va='center', 
+                           transform=axes[1, 0].transAxes, fontsize=12)
+            axes[1, 0].set_title('Learning Rate Schedule', fontweight='bold')
         
         # Modality-specific losses
         if 'modality_losses' in training_history:
             modality_data = training_history['modality_losses']
             for modality, losses in modality_data.items():
-                axes[1, 1].plot(epochs, losses, linewidth=2, label=f'{modality.upper()} Loss')
+                if len(losses) > 0:
+                    if len(losses) == len(epochs):
+                        axes[1, 1].plot(epochs, losses, linewidth=2, label=f'{modality.upper()} Loss')
+                    else:
+                        modality_epochs = range(1, len(losses) + 1)
+                        axes[1, 1].plot(modality_epochs, losses, linewidth=2, label=f'{modality.upper()} Loss')
             axes[1, 1].set_title('Modality-Specific Losses', fontweight='bold')
             axes[1, 1].set_xlabel('Epoch')
             axes[1, 1].set_ylabel('Loss')
             axes[1, 1].legend()
             axes[1, 1].grid(True, alpha=0.3)
+        else:
+            axes[1, 1].text(0.5, 0.5, 'No modality loss data', ha='center', va='center', 
+                           transform=axes[1, 1].transAxes, fontsize=12)
+            axes[1, 1].set_title('Modality-Specific Losses', fontweight='bold')
         
         plt.tight_layout()
         
@@ -1324,7 +1354,7 @@ class MultiModalCorrosionAnalyzer:
         print("✓ Fusion network training completed!")
         
         # Plot Fusion training curves
-        if save_plots:
+        if save_plots and fusion_results:
             self.plot_training_curves(
                 fusion_results,
                 save_path='/content/fusion_training_curves.png'
@@ -1491,6 +1521,119 @@ def train_complete_system():
 
     except Exception as e:
         print(f"ERROR in training pipeline: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+def safe_training():
+    """Safe training dengan error handling yang lebih baik"""
+    try:
+        analyzer = MultiModalCorrosionAnalyzer()
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
+        
+        # Prepare dataset
+        train_data, val_data = analyzer.prepare_training_dataset(data_directory)
+        print(f"Dataset prepared: {len(train_data)} train, {len(val_data)} val")
+        
+        if len(train_data) == 0:
+            print("ERROR: No training data!")
+            return None, None
+        
+        # Train Siamese networks
+        print("Starting Siamese training...")
+        results = analyzer.train_siamese_networks(
+            data_directory=data_directory,
+            epochs=20,  # Reduced
+            lr=0.001,
+            batch_size=4
+        )
+        
+        if results:
+            print("Training completed successfully!")
+            print("Results keys:", list(results.keys()))
+            
+            # Plot results
+            try:
+                analyzer.plot_training_curves(results)
+                print("Visualization completed!")
+            except Exception as e:
+                print(f"Visualization error: {e}")
+        
+        return analyzer, results
+        
+    except Exception as e:
+        print(f"Training error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
+# Jalankan safe training
+analyzer, results = safe_training()
+
+
+
+
+
+
+def train_siamese_only():
+    """Train only Siamese networks without fusion"""
+    try:
+        print("="*60)
+        print("TRAINING SIAMESE NETWORKS ONLY")
+        print("="*60)
+
+        # Initialize analyzer
+        analyzer = MultiModalCorrosionAnalyzer()
+
+        # Set data directory
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
+
+        print(f"\nData directory set to: {data_directory}")
+
+        # Check if directory exists
+        if not os.path.exists(data_directory):
+            print(f"ERROR: Data directory {data_directory} does not exist!")
+            return None, None
+
+        # Check dataset structure
+        if not analyzer.check_dataset_structure(data_directory):
+            print("ERROR: No valid dataset found!")
+            return None, None
+
+        print("\n" + "="*60)
+        print("STARTING SIAMESE TRAINING")
+        print("="*60)
+
+        # Train Siamese networks only
+        siamese_results = analyzer.train_siamese_networks(
+            data_directory=data_directory,
+            epochs=50,
+            lr=0.001,
+            batch_size=4
+        )
+
+        if siamese_results is None:
+            print("Siamese training failed!")
+            return None, None
+
+        print("Siamese training completed successfully!")
+
+        # Plot training curves
+        analyzer.plot_training_curves(
+            siamese_results,
+            save_path='/content/siamese_training_curves.png'
+        )
+
+        # Save models
+        print("Saving trained models...")
+        model_dir = "/content/siamese_models"
+        os.makedirs(model_dir, exist_ok=True)
+        analyzer.save_models(model_dir)
+
+        return analyzer, siamese_results
+
+    except Exception as e:
+        print(f"ERROR in Siamese training: {e}")
         import traceback
         traceback.print_exc()
         return None, None
