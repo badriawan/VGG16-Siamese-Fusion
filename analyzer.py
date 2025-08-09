@@ -22,12 +22,6 @@ from siamese import SiameseNetwork
 from loss import ContrastiveLoss
 
 
-try:
-    import google.colab
-    IN_COLAB = True
-except ImportError:
-    IN_COLAB = False
-
 
 class MultiModalCorrosionAnalyzer:
     """
