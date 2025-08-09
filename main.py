@@ -494,7 +494,7 @@ def main():
 # Usage examples - uncomment to run
 if __name__ == "__main__":
     # Test imports
-    test_imports()
+    #test_imports()
     
     # Example 1: Quick test
     quick_test()
