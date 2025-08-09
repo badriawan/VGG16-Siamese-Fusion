@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 # Import custom classes from separated files
@@ -498,10 +497,10 @@ def main():
 # Usage examples - uncomment to run
 if __name__ == "__main__":
     # Test imports
-    #test_imports()
+    test_imports()
     
     # Example 1: Quick test
-    quick_test()
+    # quick_test()
     
     # Example 2: Safe training
     # analyzer, results = safe_training()
