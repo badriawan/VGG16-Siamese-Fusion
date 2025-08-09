@@ -21,6 +21,14 @@ from VGG16 import VGG16FeatureExtractor
 from siamese import SiameseNetwork
 from loss import ContrastiveLoss
 
+
+try:
+    import google.colab
+    IN_COLAB = True
+except ImportError:
+    IN_COLAB = False
+
+
 class MultiModalCorrosionAnalyzer:
     """
     Debug version with verbose logging for Google Colab
