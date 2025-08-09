@@ -497,7 +497,7 @@ if __name__ == "__main__":
     test_imports()
     
     # Example 1: Quick test
-    # quick_test()
+    quick_test()
     
     # Example 2: Safe training
     # analyzer, results = safe_training()
