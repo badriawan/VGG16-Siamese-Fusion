@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 import pandas as pd
+import matplotlib.pyplot as plt
+
 
 # Import custom classes from separated files
 from VGG16 import VGG16FeatureExtractor
@@ -314,6 +316,7 @@ def quick_test():
             
             # Test visualization
             analyzer.visualize_dataset_distribution(data_directory)
+            plt.show()
             print("✓ Dataset visualization completed")
             
         else:
@@ -335,6 +338,7 @@ def quick_test():
         
         # Test training curves plot
         analyzer.plot_training_curves(sample_history)
+        plt.show()
         print("✓ Training curves visualization test completed")
 
         print("All tests passed! Ready for training.")
