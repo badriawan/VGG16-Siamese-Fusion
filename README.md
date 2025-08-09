@@ -26,6 +26,15 @@ analyzer, results = safe_training()
 evaluation_results = evaluate_and_visualize_results(analyzer, test_data_directory)
 ```
 
+## Google Collab Usage
+```
+!git clone -b v1.0 https://github.com/badriawan/VGG16-Siamese-Fusion.git
+
+%cd /content/VGG16-Siamese-Fusion/
+!python main.py
+```
+
+
 ## File Structure
 
 ```
