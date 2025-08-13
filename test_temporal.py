@@ -45,9 +45,9 @@ def test_analyzer_class():
             
         # Test for key temporal methods
         temporal_methods = [
-            'prepare_temporal_training_dataset',
-            'extract_temporal_multimodal_features',
-            'train_temporal_change_detection', 
+            'prepare_training_dataset',
+            'extract_multimodal_features',
+            'train_change_detection', 
             'predict_temporal_change',
             'visualize_temporal_dataset_distribution',
             'train_change_detection_classifier',
@@ -92,10 +92,10 @@ def test_main_temporal_functions():
             content = f.read()
             
         temporal_functions = [
-            'train_temporal_change_detection',
-            'test_temporal_dataset',
-            'evaluate_temporal_change_detection',
-            'TEMPORAL CORROSION CHANGE DETECTION ANALYZER'
+            'train_change_detection',
+            'test_system',
+            'evaluate_change_detection',
+            'CORROSION CHANGE DETECTION ANALYZER'
         ]
         
         for func in temporal_functions:

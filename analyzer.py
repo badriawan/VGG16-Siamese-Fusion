@@ -133,8 +133,8 @@ class MultiModalCorrosionAnalyzer:
 
 
 
-    def prepare_temporal_training_dataset(self, data_directory, validation_split=0.2):
-        """Prepare temporal training dataset for change detection
+    def prepare_training_dataset(self, data_directory, validation_split=0.2):
+        """Prepare training dataset for change detection
         
         Expected directory structure:
         data_directory/
@@ -153,7 +153,7 @@ class MultiModalCorrosionAnalyzer:
             train_data: List of temporal pairs with before/after paths
             val_data: Validation temporal pairs
         """
-        print(f"\nPreparing temporal training dataset from: {data_directory}")
+        print(f"\nPreparing training dataset from: {data_directory}")
 
         dataset = []
         total_samples = 0
@@ -423,8 +423,8 @@ class MultiModalCorrosionAnalyzer:
 
         return features
     
-    def extract_temporal_multimodal_features(self, before_paths=None, after_paths=None):
-        """Extract temporal features from before/after modality pairs
+    def extract_multimodal_features(self, before_paths=None, after_paths=None):
+        """Extract features from before/after modality pairs
         
         Args:
             before_paths: dict with keys {'rgb', 'thermal', 'lidar'} for before timepoint
@@ -1059,14 +1059,14 @@ class MultiModalCorrosionAnalyzer:
         print("Siamese network training completed!")
         return training_history
     
-    def train_temporal_change_detection(self, data_directory, epochs=100, lr=0.001, batch_size=16):
-        """Train complete temporal change detection system
+    def train_change_detection(self, data_directory, epochs=100, lr=0.001, batch_size=16):
+        """Train complete change detection system
         
         Stage 1: Train Siamese networks on individual modalities
         Stage 2: Train temporal fusion network for change detection
         """
         print("="*50)
-        print("TRAINING TEMPORAL CHANGE DETECTION SYSTEM")
+        print("TRAINING CHANGE DETECTION SYSTEM")
         print("="*50)
         
         # Check dataset
@@ -1074,11 +1074,11 @@ class MultiModalCorrosionAnalyzer:
             print("Dataset check failed!")
             return None
             
-        # Prepare temporal dataset
-        train_data, val_data = self.prepare_temporal_training_dataset(data_directory)
+        # Prepare dataset
+        train_data, val_data = self.prepare_training_dataset(data_directory)
         
         if len(train_data) == 0:
-            print("ERROR: No temporal training data found!")
+            print("ERROR: No training data found!")
             return None
             
         # Stage 1: Train Siamese Networks
@@ -1148,7 +1148,7 @@ class MultiModalCorrosionAnalyzer:
             for sample in train_data:
                 try:
                     # Extract temporal features using trained Siamese networks
-                    temporal_features = self.extract_temporal_multimodal_features(
+                    temporal_features = self.extract_multimodal_features(
                         before_paths=sample['before'],
                         after_paths=sample['after']
                     )
@@ -1231,7 +1231,7 @@ class MultiModalCorrosionAnalyzer:
             for sample in val_data:
                 try:
                     # Extract temporal features
-                    temporal_features = self.extract_temporal_multimodal_features(
+                    temporal_features = self.extract_multimodal_features(
                         before_paths=sample['before'],
                         after_paths=sample['after']
                     )
@@ -1293,7 +1293,7 @@ class MultiModalCorrosionAnalyzer:
                 return None
             
             # Extract temporal features
-            temporal_features = self.extract_temporal_multimodal_features(
+            temporal_features = self.extract_multimodal_features(
                 before_paths=before_paths,
                 after_paths=after_paths
             )
@@ -1536,10 +1536,10 @@ class MultiModalCorrosionAnalyzer:
                 for pair, label in zip(batch_pairs, batch_labels):
                     try:
                         # Extract temporal features
-                        before_features = self.extract_temporal_multimodal_features(
+                        before_features = self.extract_multimodal_features(
                             before_paths=pair[0], after_paths=None
                         )
-                        after_features = self.extract_temporal_multimodal_features(
+                        after_features = self.extract_multimodal_features(
                             before_paths=pair[1], after_paths=None  
                         )
                         
@@ -1924,7 +1924,7 @@ class MultiModalCorrosionAnalyzer:
         )
         
         # Complete temporal training
-        results = self.train_temporal_change_detection(
+        results = self.train_change_detection(
             data_directory=data_directory,
             epochs=siamese_epochs,
             lr=siamese_lr
