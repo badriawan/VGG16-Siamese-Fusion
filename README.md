@@ -1,6 +1,6 @@
 # VGG16-Siamese-Fusion: Temporal Change Detection
 
-## Updated Objective (v1.0)
+## Updated Objective (v2.0)
 
 **Previous Objective**: Multi-class classification of corrosion severity (no_corrosion, mild, severe)
 
