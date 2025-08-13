@@ -310,7 +310,7 @@ def quick_test():
             print("✓ Dataset analysis completed")
             
             # Test dataset preparation
-            train_data, val_data = analyzer.prepare_training_dataset(data_directory)
+            train_data, val_data = analyzer.prepare_temporal_training_dataset(data_directory)
             print(f"✓ Dataset preparation completed: {len(train_data)} train, {len(val_data)} val")
             
             # Test visualization
