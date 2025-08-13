@@ -472,9 +472,12 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
         return None
 
 def main():
-    """Main function to demonstrate usage"""
+    """Main function for temporal change detection system"""
     print("="*60)
-    print("MULTIMODAL CORROSION ANALYZER")
+    print("TEMPORAL CORROSION CHANGE DETECTION ANALYZER")
+    print("Updated Objective: Detect corrosion growth progression")
+    print("Input: Before/After temporal pairs (RGB, Thermal, LIDAR)")
+    print("Output: Binary classification (Change/No Change)")
     print("="*60)
     
     # Test imports first
@@ -482,15 +485,15 @@ def main():
         print("❌ Import test failed! Please check your file structure.")
         return
     
-    print("\nChoose an option:")
-    print("1. Quick test")
-    print("2. Safe training (Siamese only)")
-    print("3. Complete training pipeline")
-    print("4. Train Siamese networks only")
-    print("5. Custom training")
+    print("\nAvailable Options:")
+    print("1. Quick test (temporal/legacy auto-detection)")
+    print("2. Train temporal change detection system (NEW)")
+    print("3. Train legacy classification system")
+    print("4. Complete temporal pipeline")
+    print("5. Evaluate trained temporal system")
     
     # For demonstration, run quick test
-    print("\nRunning quick test...")
+    print("\nRunning automatic test...")
     quick_test()
 
 
