@@ -132,7 +132,7 @@ def train_change_detection():
         analyzer = MultiModalCorrosionAnalyzer()
         
         # Data directory for temporal dataset structure
-        data_directory = "/content/drive/MyDrive/S3 UTP/temporal_dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         
         print(f"\nExpected dataset structure:")
         print("temporal_dataset/")
