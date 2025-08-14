@@ -120,6 +120,58 @@ def test_imports():
         traceback.print_exc()
         return False
 
+
+def visualize_dataset():
+    """Visualize dataset"""
+    try:
+        print("="*60)
+        print("VISUALIZE DATASET")
+        print("="*60)
+        
+        # Initialize analyzer
+        analyzer = MultiModalCorrosionAnalyzer()
+        
+        # Data directory for temporal dataset structure
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
+        
+        print(f"\nExpected dataset structure:")
+        print("temporal_dataset/")
+        print("├── sample_001/")
+        print("│   ├── before/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   ├── after/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   └── label.txt      # 0 = no change, 1 = change detected")
+        print(f"\nData directory: {data_directory}")
+        
+        # Check if dataset exists
+        if not os.path.exists(data_directory):
+            print(f"\nWARNING: Dataset not found at {data_directory}")
+            print("Please prepare your dataset according to the structure above.")
+            return None, None
+        
+        # Train complete system
+        results = analyzer.visualize_dataset(
+            data_directory=data_directory,
+        )
+        
+        if results:
+            print("\n✓ Visualize dataset completed successfully!")
+            print("Results keys:", list(results.keys()))
+
+        
+        return analyzer, results
+        
+    except Exception as e:
+        print(f"Visualize dataset error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None
+
 def train_change_detection():
     """Train change detection system"""
     try:
