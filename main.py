@@ -161,7 +161,11 @@ def visualize_dataset():
         
         if results:
             print("\n✓ Visualize dataset completed successfully!")
-            print("Results keys:", list(results.keys()))
+            print(f"Visualization result type: {type(results)}")
+            if hasattr(results, 'keys'):
+                print("Results keys:", list(results.keys()))
+            else:
+                print("Visualization plot created successfully!")
 
         
         return analyzer, results
