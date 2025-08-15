@@ -154,8 +154,8 @@ def visualize_dataset():
             print("Please prepare your dataset according to the structure above.")
             return None, None
         
-        # Train complete system
-        results = analyzer.visualize_temporal_dataset_distribution(
+        # Visualize dataset
+        results = analyzer.visualize_dataset_distribution(
             data_directory=data_directory,
         )
         
