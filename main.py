@@ -155,7 +155,7 @@ def visualize_dataset():
             return None, None
         
         # Train complete system
-        results = analyzer.visualize_dataset(
+        results = analyzer.visualize_temporal_dataset_distribution(
             data_directory=data_directory,
         )
         
@@ -256,7 +256,7 @@ def test_system():
                 print(f"✗ Method {method} missing")
         
         # Test dataset structure check
-        data_directory = "/content/drive/MyDrive/S3 UTP/temporal_dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         if os.path.exists(data_directory):
             print("✓ Dataset directory found")
             
