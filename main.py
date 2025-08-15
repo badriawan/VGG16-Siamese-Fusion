@@ -17,7 +17,6 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
 import pandas as pd
 
-
 # Import custom classes from separated files
 from VGG16 import VGG16FeatureExtractor
 from siamese import SiameseNetwork
@@ -90,7 +89,6 @@ plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 plt.rcParams['figure.dpi'] = 300
 
-
 def test_imports():
     """Test if all imports are working correctly"""
     try:
@@ -122,105 +120,109 @@ def test_imports():
         traceback.print_exc()
         return False
 
-def train_complete_system():
-    """Complete training pipeline with comprehensive error handling and visualization"""
+
+def visualize_dataset():
+    """Visualize dataset"""
     try:
         print("="*60)
-        print("INITIALIZING MULTIMODAL CORROSION ANALYZER")
+        print("VISUALIZE DATASET")
         print("="*60)
-
+        
         # Initialize analyzer
         analyzer = MultiModalCorrosionAnalyzer()
-
-        # Set data directory
-        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
-
-        print(f"\nData directory set to: {data_directory}")
-
-        # Check if directory exists
+        
+        # Data directory for temporal dataset structure
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
+        
+        print(f"\nExpected dataset structure:")
+        print("temporal_dataset/")
+        print("├── sample_001/")
+        print("│   ├── before/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   ├── after/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   └── label.txt      # 0 = no change, 1 = change detected")
+        print(f"\nData directory: {data_directory}")
+        
+        # Check if dataset exists
         if not os.path.exists(data_directory):
-            print(f"ERROR: Data directory {data_directory} does not exist!")
+            print(f"\nWARNING: Dataset not found at {data_directory}")
+            print("Please prepare your dataset according to the structure above.")
             return None, None
-
-        # Check dataset structure
-        if not analyzer.check_dataset_structure(data_directory):
-            print("ERROR: No valid dataset found!")
-            return None, None
-
-        print("\n" + "="*60)
-        print("STARTING COMPLETE TRAINING PIPELINE")
-        print("="*60)
-
-        # Run complete training pipeline with visualization
-        results = analyzer.complete_training_pipeline(
+        
+        # Train complete system
+        results = analyzer.visualize_dataset(
             data_directory=data_directory,
-            siamese_epochs=50,  # Reduced for testing
-            fusion_epochs=50,    # Reduced for testing
-            siamese_lr=0.001,
-            fusion_lr=0.001,
-            save_plots=True
         )
+        
+        if results:
+            print("\n✓ Visualize dataset completed successfully!")
+            print("Results keys:", list(results.keys()))
 
-        if results is None:
-            print("Training pipeline failed!")
-            return None, None
-
-        print("Complete training pipeline finished successfully!")
-
-        # Save models
-        print("Saving trained models...")
-        model_dir = "/content/trained_models"
-        os.makedirs(model_dir, exist_ok=True)
-        analyzer.save_complete_model(model_dir)
-
+        
         return analyzer, results
-
+        
     except Exception as e:
-        print(f"ERROR in training pipeline: {e}")
+        print(f"Visualize dataset error: {e}")
         import traceback
         traceback.print_exc()
         return None, None
 
-def safe_training():
-    """Safe training dengan error handling yang lebih baik"""
+def train_change_detection():
+    """Train change detection system"""
     try:
+        print("="*60)
+        print("CHANGE DETECTION TRAINING")
+        print("Objective: Detect corrosion growth between before/after timepoints")
+        print("="*60)
+        
+        # Initialize analyzer
         analyzer = MultiModalCorrosionAnalyzer()
-        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
         
-        # Prepare dataset
-        train_data, val_data = analyzer.prepare_training_dataset(data_directory)
-        print(f"Dataset prepared: {len(train_data)} train, {len(val_data)} val")
+        # Data directory for temporal dataset structure
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         
-        if len(train_data) == 0:
-            print("ERROR: No training data!")
+        print(f"\nExpected dataset structure:")
+        print("temporal_dataset/")
+        print("├── sample_001/")
+        print("│   ├── before/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   ├── after/")
+        print("│   │   ├── rgb.png")
+        print("│   │   ├── thermal.png")
+        print("│   │   └── depth.png (LIDAR)")
+        print("│   └── label.txt      # 0 = no change, 1 = change detected")
+        print(f"\nData directory: {data_directory}")
+        
+        # Check if dataset exists
+        if not os.path.exists(data_directory):
+            print(f"\nWARNING: Dataset not found at {data_directory}")
+            print("Please prepare your dataset according to the structure above.")
             return None, None
         
-        # Train Siamese networks
-        print("Starting Siamese training...")
-        results = analyzer.train_siamese_networks(
+        # Train complete system
+        results = analyzer.train_change_detection(
             data_directory=data_directory,
-            epochs=20,  # Reduced
+            epochs=50,  # Reduced for testing
             lr=0.001,
-            batch_size=4
+            batch_size=8
         )
         
         if results:
-            print("Training completed successfully!")
+            print("\n✓ Change detection training completed successfully!")
             print("Results keys:", list(results.keys()))
             
-            # Plot results
-            try:
-                # Use Siamese-specific visualization
-                analyzer.plot_siamese_training_curves(results)
-                print("Siamese training visualization completed!")
-            except Exception as e:
-                print(f"Visualization error: {e}")
-                # Fallback to general visualization
-                try:
-                    analyzer.plot_training_curves(results)
-                    print("Fallback visualization completed!")
-                except Exception as e2:
-                    print(f"Fallback visualization also failed: {e2}")
+            # Save trained model
+            model_dir = "/content/trained_models"
+            os.makedirs(model_dir, exist_ok=True)
+            analyzer.save_temporal_model(model_dir)
+            print(f"✓ Model saved to: {model_dir}")
         
         return analyzer, results
         
@@ -230,131 +232,83 @@ def safe_training():
         traceback.print_exc()
         return None, None
 
-def train_siamese_only():
-    """Train only Siamese networks without fusion"""
-    try:
-        print("="*60)
-        print("TRAINING SIAMESE NETWORKS ONLY")
-        print("="*60)
-
-        # Initialize analyzer
-        analyzer = MultiModalCorrosionAnalyzer()
-
-        # Set data directory
-        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
-
-        print(f"\nData directory set to: {data_directory}")
-
-        # Check if directory exists
-        if not os.path.exists(data_directory):
-            print(f"ERROR: Data directory {data_directory} does not exist!")
-            return None, None
-
-        # Check dataset structure
-        if not analyzer.check_dataset_structure(data_directory):
-            print("ERROR: No valid dataset found!")
-            return None, None
-
-        print("\n" + "="*60)
-        print("STARTING SIAMESE TRAINING")
-        print("="*60)
-
-        # Train Siamese networks only
-        siamese_results = analyzer.train_siamese_networks(
-            data_directory=data_directory,
-            epochs=50,
-            lr=0.001,
-            batch_size=4
-        )
-
-        if siamese_results is None:
-            print("Siamese training failed!")
-            return None, None
-
-        print("Siamese training completed successfully!")
-
-        # Plot training curves
-        analyzer.plot_training_curves(
-            siamese_results,
-            save_path='/content/siamese_training_curves.png'
-        )
-
-        # Save models
-        print("Saving trained models...")
-        model_dir = "/content/siamese_models"
-        os.makedirs(model_dir, exist_ok=True)
-        analyzer.save_models(model_dir)
-
-        return analyzer, siamese_results
-
-    except Exception as e:
-        print(f"ERROR in Siamese training: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None
-
-def quick_test():
-    """Quick test to verify everything works"""
-    print("Running quick test...")
-
+def test_system():
+    """Test system functionality"""
+    print("Running system test...")
+    
     try:
         # Test basic initialization
         analyzer = MultiModalCorrosionAnalyzer()
         print("✓ Analyzer initialized")
-
+        
+        # Test methods
+        methods_to_test = [
+            'prepare_training_dataset',
+            'extract_multimodal_features', 
+            'train_change_detection',
+            'predict_temporal_change'
+        ]
+        
+        for method in methods_to_test:
+            if hasattr(analyzer, method):
+                print(f"✓ Method {method} exists")
+            else:
+                print(f"✗ Method {method} missing")
+        
         # Test dataset structure check
-        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/temporal_dataset"
         if os.path.exists(data_directory):
-            # Analyze dataset structure
-            dataset_info = analyzer.analyze_dataset_structure(data_directory)
-            print("✓ Dataset analysis completed")
+            print("✓ Dataset directory found")
             
             # Test dataset preparation
             train_data, val_data = analyzer.prepare_training_dataset(data_directory)
-            print(f"✓ Dataset preparation completed: {len(train_data)} train, {len(val_data)} val")
-            
-            # Test visualization
-            analyzer.visualize_dataset_distribution(data_directory)
-            plt.show()
-            print("✓ Dataset visualization completed")
+            print(f"✓ Dataset preparation: {len(train_data)} train, {len(val_data)} val")
             
         else:
             print("⚠ Dataset directory not found, skipping dataset test")
-
-        # Test visualization methods
-        print("Testing visualization methods...")
-        # Create sample data for visualization test
-        sample_history = {
-            'train_losses': [0.5, 0.4, 0.3, 0.25, 0.2],
-            'val_losses': [0.6, 0.5, 0.4, 0.35, 0.3],
-            'val_accuracies': [0.6, 0.7, 0.8, 0.85, 0.9],
-            'modality_losses': {
-                'rgb': [0.5, 0.4, 0.3, 0.25, 0.2],
-                'thermal': [0.6, 0.5, 0.4, 0.35, 0.3],
-                'lidar': [0.7, 0.6, 0.5, 0.45, 0.4]
-            }
-        }
         
-        # Test training curves plot
-        analyzer.plot_training_curves(sample_history)
-        plt.show()
-        print("✓ Training curves visualization test completed")
-
-        print("All tests passed! Ready for training.")
+        print("System test completed successfully!")
         return True
-
+        
     except Exception as e:
-        print(f"✗ Test failed: {e}")
+        print(f"✗ System test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
 
-def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=True):
-    """
-    Comprehensive evaluation and visualization for paper
-    """
+def predict_change(analyzer, before_paths, after_paths):
+    """Make change prediction on new data"""
+    try:
+        print("Making change prediction...")
+        
+        if not analyzer:
+            print("ERROR: No trained analyzer provided!")
+            return None
+        
+        # Make prediction
+        prediction = analyzer.predict_temporal_change(
+            before_paths=before_paths,
+            after_paths=after_paths
+        )
+        
+        if prediction:
+            print(f"\n--- PREDICTION RESULT ---")
+            print(f"Change Status: {prediction['predicted_class']}")
+            print(f"Confidence: {prediction['max_confidence']:.4f}")
+            print(f"Confidence Scores:")
+            for class_name, score in prediction['confidence_scores'].items():
+                print(f"  {class_name}: {score:.4f}")
+        
+        return prediction
+        
+    except Exception as e:
+        print(f"Prediction error: {e}")
+        return None
+
+def evaluate_change_detection(analyzer, test_data_directory, save_plots=True):
+    """Evaluate change detection system"""
     print("="*60)
-    print("COMPREHENSIVE EVALUATION AND VISUALIZATION")
+    print("CHANGE DETECTION EVALUATION")
     print("="*60)
     
     try:
@@ -364,7 +318,7 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
         if len(test_data) == 0:
             print("ERROR: No test data found!")
             return None
-        
+            
         print(f"Evaluating on {len(test_data)} test samples...")
         
         # Collect predictions and true labels
@@ -375,19 +329,18 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
         for sample in test_data:
             try:
                 # Make prediction
-                result = analyzer.predict_corrosion(
-                    rgb_path=sample.get('rgb'),
-                    thermal_path=sample.get('thermal'),
-                    lidar_path=sample.get('lidar')
+                result = analyzer.predict_temporal_change(
+                    before_paths=sample['before'],
+                    after_paths=sample['after']
                 )
                 
                 if result:
-                    y_true.append(sample['class'])
+                    y_true.append(sample['change_label'])
                     y_pred.append(result['predicted_index'])
                     confidence_scores.append(result['max_confidence'])
                     
             except Exception as e:
-                print(f"Error processing sample: {e}")
+                print(f"Error processing sample {sample['sample_id']}: {e}")
                 continue
         
         if len(y_true) == 0:
@@ -395,65 +348,22 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
             return None
         
         # Calculate metrics
-        from sklearn.metrics import accuracy_score, precision_recall_fscore_support
+        from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
         
         accuracy = accuracy_score(y_true, y_pred)
         precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average='weighted')
         
-        print(f"\nEvaluation Results:")
+        print(f"\nChange Detection Results:")
         print(f"Accuracy: {accuracy:.4f}")
         print(f"Precision: {precision:.4f}")
         print(f"Recall: {recall:.4f}")
         print(f"F1-Score: {f1:.4f}")
         
-        # Create visualizations
-        if save_plots:
-            # Confusion Matrix
-            analyzer.plot_confusion_matrix(
-                y_true, y_pred,
-                save_path='/content/confusion_matrix.png'
-            )
-            
-            # Confidence Distribution
-            plt.figure(figsize=(10, 6))
-            plt.hist(confidence_scores, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
-            plt.title('Prediction Confidence Distribution', fontweight='bold', fontsize=14)
-            plt.xlabel('Confidence Score', fontweight='bold')
-            plt.ylabel('Frequency', fontweight='bold')
-            plt.grid(True, alpha=0.3)
-            plt.savefig('/content/confidence_distribution.png', dpi=300, bbox_inches='tight')
-            plt.show()
-            
-            # Accuracy by Class
-            class_names = ['No Corrosion', 'Mild Corrosion', 'Severe Corrosion']
-            class_accuracies = []
-            
-            for i in range(3):
-                class_mask = [y == i for y in y_true]
-                if any(class_mask):
-                    class_pred = [y_pred[j] for j, mask in enumerate(class_mask) if mask]
-                    class_true = [y_true[j] for j, mask in enumerate(class_mask) if mask]
-                    class_acc = sum(1 for p, t in zip(class_pred, class_true) if p == t) / len(class_true)
-                    class_accuracies.append(class_acc)
-                else:
-                    class_accuracies.append(0.0)
-            
-            plt.figure(figsize=(10, 6))
-            bars = plt.bar(class_names, class_accuracies, color=['#2E8B57', '#FF6B6B', '#4ECDC4'], alpha=0.8)
-            plt.title('Accuracy by Corrosion Class', fontweight='bold', fontsize=14)
-            plt.xlabel('Corrosion Class', fontweight='bold')
-            plt.ylabel('Accuracy', fontweight='bold')
-            plt.ylim(0, 1)
-            
-            # Add value labels
-            for bar, acc in zip(bars, class_accuracies):
-                height = bar.get_height()
-                plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                        f'{acc:.3f}', ha='center', va='bottom', fontweight='bold')
-            
-            plt.tight_layout()
-            plt.savefig('/content/accuracy_by_class.png', dpi=300, bbox_inches='tight')
-            plt.show()
+        # Detailed classification report
+        class_names = ['No Change', 'Change Detected']
+        report = classification_report(y_true, y_pred, target_names=class_names)
+        print(f"\nDetailed Classification Report:")
+        print(report)
         
         return {
             'accuracy': accuracy,
@@ -462,7 +372,8 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
             'f1_score': f1,
             'y_true': y_true,
             'y_pred': y_pred,
-            'confidence_scores': confidence_scores
+            'confidence_scores': confidence_scores,
+            'classification_report': report
         }
         
     except Exception as e:
@@ -472,9 +383,12 @@ def evaluate_and_visualize_results(analyzer, test_data_directory, save_plots=Tru
         return None
 
 def main():
-    """Main function to demonstrate usage"""
+    """Main function for change detection system"""
     print("="*60)
-    print("MULTIMODAL CORROSION ANALYZER")
+    print("CORROSION CHANGE DETECTION ANALYZER")
+    print("Objective: Detect corrosion growth progression")
+    print("Input: Before/After temporal pairs (RGB, Thermal, LIDAR)")
+    print("Output: Binary classification (Change/No Change)")
     print("="*60)
     
     # Test imports first
@@ -482,58 +396,80 @@ def main():
         print("❌ Import test failed! Please check your file structure.")
         return
     
-    print("\nChoose an option:")
-    print("1. Quick test")
-    print("2. Safe training (Siamese only)")
-    print("3. Complete training pipeline")
-    print("4. Train Siamese networks only")
-    print("5. Custom training")
+    print("\nAvailable Options:")
+    print("1. Test system functionality")
+    print("2. Train change detection system")
+    print("3. Evaluate trained system")
+    print("4. Make prediction on new data")
     
-    # For demonstration, run quick test
-    print("\nRunning quick test...")
-    quick_test()
+    # For demonstration, run system test
+    print("\nRunning system test...")
+    test_system()
 
-
-# Usage examples - uncomment to run
+# Usage examples for change detection
 if __name__ == "__main__":
     # Test imports
     test_imports()
     
-    # Example 1: Quick test
-    # quick_test()
+    # Available usage patterns:
     
-    # Example 2: Safe training
-    # analyzer, results = safe_training()
+    # Example 1: Test system
+    # test_system()
     
-    # Example 3: Complete training pipeline
-    # analyzer, results = train_complete_system()
+    # Example 2: Train change detection
+    # analyzer, results = train_change_detection()
     
-    # Example 4: Siamese networks only
-    # analyzer, results = train_siamese_only()
+    # Example 3: Evaluate system
+    # if analyzer:
+    #     test_dir = "/content/drive/MyDrive/S3 UTP/temporal_test_dataset"
+    #     evaluation_results = evaluate_change_detection(analyzer, test_dir)
+    
+    # Example 4: Make predictions
+    # if analyzer:
+    #     before_paths = {
+    #         'rgb': '/path/to/before_rgb.png',
+    #         'thermal': '/path/to/before_thermal.png',
+    #         'lidar': '/path/to/before_depth.png'
+    #     }
+    #     after_paths = {
+    #         'rgb': '/path/to/after_rgb.png',
+    #         'thermal': '/path/to/after_thermal.png', 
+    #         'lidar': '/path/to/after_depth.png'
+    #     }
+    #     prediction = predict_change(analyzer, before_paths, after_paths)
 
-# Manual usage examples:
+# Manual usage examples for change detection:
 """
-# Test imports
+CHANGE DETECTION WORKFLOW:
+
+# 1. Test system
 test_imports()
+test_system()
 
-# Quick test
-quick_test()
+# 2. Train change detection system
+analyzer, results = train_change_detection()
 
-# Safe training (recommended for first time)
-analyzer, results = safe_training()
+# 3. Evaluate system
+if analyzer:
+    test_dir = "/content/drive/MyDrive/S3 UTP/temporal_test_dataset"
+    evaluation_results = evaluate_change_detection(analyzer, test_dir)
 
-# Complete training pipeline
-analyzer, results = train_complete_system()
-
-# Train only Siamese networks
-analyzer, results = train_siamese_only()
-
-# Evaluation after training
-evaluation_results = evaluate_and_visualize_results(analyzer, test_data_directory)
+# 4. Make predictions on new temporal pairs
+if analyzer:
+    before_paths = {
+        'rgb': '/path/to/before_rgb.png',
+        'thermal': '/path/to/before_thermal.png',
+        'lidar': '/path/to/before_depth.png'
+    }
+    after_paths = {
+        'rgb': '/path/to/after_rgb.png', 
+        'thermal': '/path/to/after_thermal.png',
+        'lidar': '/path/to/after_depth.png'
+    }
+    
+    prediction = predict_change(analyzer, before_paths, after_paths)
+    
+    if prediction:
+        print(f"Change Status: {prediction['predicted_class']}")
+        print(f"Confidence: {prediction['max_confidence']:.4f}")
 """
-
-
-
-
-
-

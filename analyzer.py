@@ -25,7 +25,16 @@ from loss import ContrastiveLoss
 
 class MultiModalCorrosionAnalyzer:
     """
-    Debug version with verbose logging for Google Colab
+    Multi-modal Corrosion Change Detection Analyzer
+    
+    Detects growth/progression of pitting corrosion by comparing 
+    before/after temporal pairs using Siamese networks with 
+    RGB, Thermal, and LIDAR data.
+    
+    New Objective:
+    - Detect corrosion progression between time points
+    - Binary classification: Change/No Change
+    - Multi-modal feature fusion for robust detection
     """
     def __init__(self, device='cuda' if torch.cuda.is_available() else 'cpu'):
         print(f"Initializing MultiModalCorrosionAnalyzer on {device}")
@@ -43,9 +52,12 @@ class MultiModalCorrosionAnalyzer:
         self.thermal_siamese = SiameseNetwork().to(device)
         self.lidar_siamese = SiameseNetwork().to(device)
 
-        # Fusion network
-        print("Building fusion network...")
-        self.fusion_net = self._build_fusion_network().to(device)
+        # Fusion network for temporal comparison
+        print("Building temporal fusion network...")
+        self.fusion_net = self._build_temporal_fusion_network().to(device)
+        
+        # Change detection classifier (Binary: Change/No Change)
+        self.change_classifier = None  # Will be initialized during training
 
         # Preprocessing transforms
         self.rgb_transform = transforms.Compose([
@@ -71,18 +83,27 @@ class MultiModalCorrosionAnalyzer:
 
         print("MultiModalCorrosionAnalyzer initialized successfully!")
 
-    def _build_fusion_network(self):
-        """Build multi-modal fusion network"""
+    def _build_temporal_fusion_network(self):
+        """Build temporal comparison fusion network
+        
+        Takes concatenated before/after features from all modalities
+        Input: [RGB_before, Thermal_before, LIDAR_before, RGB_after, Thermal_after, LIDAR_after]
+        Output: Fused temporal embedding for change detection
+        """
         return nn.Sequential(
-            nn.Linear(3 * 512, 1024),
+            # Input: 6 modalities * 512 features = 3072 features
+            nn.Linear(6 * 512, 2048),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(2048, 1024),
             nn.ReLU(inplace=True),
             nn.Dropout(0.3),
             nn.Linear(1024, 512),
             nn.ReLU(inplace=True),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
             nn.Linear(512, 256),
             nn.ReLU(inplace=True),
-            nn.Linear(256, 128)
+            nn.Linear(256, 128)  # Final temporal embedding
         )
 
     def check_dataset_structure(self, data_directory):
@@ -113,110 +134,132 @@ class MultiModalCorrosionAnalyzer:
 
 
     def prepare_training_dataset(self, data_directory, validation_split=0.2):
-        """Prepare training dataset from directory structure with detailed logging"""
+        """Prepare training dataset for change detection
+        
+        Expected directory structure:
+        data_directory/
+        ├── sample_001/
+        │   ├── before/
+        │   │   ├── rgb.png
+        │   │   ├── thermal.png
+        │   │   └── depth.png
+        │   └── after/
+        │       ├── rgb.png
+        │       ├── thermal.png
+        │       └── depth.png
+        │   └── label.txt  # Contains: 0 (no change) or 1 (change detected)
+        
+        Returns:
+            train_data: List of temporal pairs with before/after paths
+            val_data: Validation temporal pairs
+        """
         print(f"\nPreparing training dataset from: {data_directory}")
 
-        dataset = defaultdict(list)
+        dataset = []
         total_samples = 0
 
-        # Scan directory for samples
-        for class_dir in os.listdir(data_directory):
-            class_path = os.path.join(data_directory, class_dir)
-            if not os.path.isdir(class_path):
+        # Scan directory for temporal samples
+        for sample_dir in os.listdir(data_directory):
+            sample_path = os.path.join(data_directory, sample_dir)
+            if not os.path.isdir(sample_path):
                 continue
 
-            print(f"Processing class directory: {class_dir}")
-
-            # Extract class label from directory name
-            if 'no_corrosion' in class_dir.lower():
-                class_label = 0
-            elif 'mild' in class_dir.lower():
-                class_label = 1
-            elif 'severe' in class_dir.lower():
-                class_label = 2
-            else:
+            print(f"Processing sample directory: {sample_dir}")
+            
+            # Check for before/after structure
+            before_path = os.path.join(sample_path, 'before')
+            after_path = os.path.join(sample_path, 'after')
+            label_path = os.path.join(sample_path, 'label.txt')
+            
+            if not (os.path.exists(before_path) and os.path.exists(after_path)):
+                print(f"  Skipping {sample_dir}: Missing before/after directories")
+                continue
+                
+            # Read change label
+            change_label = 0  # Default: no change
+            if os.path.exists(label_path):
                 try:
-                    class_label = int(class_dir.split('_')[1])
+                    with open(label_path, 'r') as f:
+                        change_label = int(f.read().strip())
                 except:
-                    class_label = 0
+                    print(f"  Warning: Could not read label for {sample_dir}, using default (0)")
 
-            # Group files by sample ID - handle nested structure
-            samples = defaultdict(dict)
-            
-            # Check if there are subdirectories (sample_1, sample_2, etc.)
-            subdirs = [d for d in os.listdir(class_path) if os.path.isdir(os.path.join(class_path, d))]
-            
-            if subdirs:
-                # Handle nested structure: class_dir/sample_X/files
-                print(f"  Found {len(subdirs)} sample subdirectories")
-                for subdir in subdirs:
-                    subdir_path = os.path.join(class_path, subdir)
-                    files = [f for f in os.listdir(subdir_path) if f.endswith('.png')]
+            # Extract modality files from before/after directories
+            def extract_modality_paths(directory_path):
+                """Extract RGB, thermal, and LIDAR paths from a directory"""
+                modality_paths = {}
+                
+                if not os.path.exists(directory_path):
+                    return modality_paths
                     
-                    for file in files:
-                        # Handle different naming conventions
-                        if '_therm.png' in file:
-                            # Thermal image
-                            base_name = file.replace('_therm.png', '')
-                            samples[base_name]['thermal'] = os.path.join(subdir_path, file)
-                        elif '_depth.png' in file:
-                            # LiDAR depth image
-                            base_name = file.replace('_depth.png', '')
-                            samples[base_name]['lidar'] = os.path.join(subdir_path, file)
-                        elif file.endswith('.png') and not ('_therm' in file or '_depth' in file):
-                            # RGB image (default)
-                            base_name = file.replace('.png', '')
-                            samples[base_name]['rgb'] = os.path.join(subdir_path, file)
-            else:
-                # Handle flat structure: class_dir/files
-                files = [f for f in os.listdir(class_path) if f.endswith('.png')]
-                print(f"  Found {len(files)} PNG files in flat structure")
+                files = [f for f in os.listdir(directory_path) if f.endswith('.png')]
                 
                 for file in files:
-                    # Handle different naming conventions
-                    if '_therm.png' in file:
-                        # Thermal image
-                        base_name = file.replace('_therm.png', '')
-                        samples[base_name]['thermal'] = os.path.join(class_path, file)
-                    elif '_depth.png' in file:
-                        # LiDAR depth image
-                        base_name = file.replace('_depth.png', '')
-                        samples[base_name]['lidar'] = os.path.join(class_path, file)
-                    elif file.endswith('.png') and not ('_therm' in file or '_depth' in file):
-                        # RGB image (default)
-                        base_name = file.replace('.png', '')
-                        samples[base_name]['rgb'] = os.path.join(class_path, file)
+                    file_path = os.path.join(directory_path, file)
+                    
+                    # Determine modality based on filename
+                    if 'thermal' in file.lower() or 'therm' in file.lower():
+                        modality_paths['thermal'] = file_path
+                    elif 'depth' in file.lower() or 'lidar' in file.lower():
+                        modality_paths['lidar'] = file_path
+                    elif 'rgb' in file.lower() or file.lower() == 'rgb.png':
+                        modality_paths['rgb'] = file_path
+                    else:
+                        # Default assumption: first unknown file is RGB
+                        if 'rgb' not in modality_paths:
+                            modality_paths['rgb'] = file_path
+                            
+                return modality_paths
+            
+            # Get before and after modality paths
+            before_modalities = extract_modality_paths(before_path)
+            after_modalities = extract_modality_paths(after_path)
+            
+            # Verify we have data for both timepoints
+            if len(before_modalities) == 0 or len(after_modalities) == 0:
+                print(f"  Skipping {sample_dir}: Missing modality data")
+                continue
 
-            # Add complete samples to dataset
-            class_count = 0
-            for sample_id, modalities in samples.items():
-                if len(modalities) > 0:
-                    dataset[class_label].append({
-                        'sample_id': sample_id,
-                        'class': class_label,
-                        **modalities
-                    })
-                    class_count += 1
+            # Create temporal sample record
+            temporal_sample = {
+                'sample_id': sample_dir,
+                'change_label': change_label,
+                'before': before_modalities,
+                'after': after_modalities
+            }
+            
+            dataset.append(temporal_sample)
+            total_samples += 1
+            
+            print(f"  Added temporal sample: {sample_dir}")
+            print(f"    Before modalities: {list(before_modalities.keys())}")
+            print(f"    After modalities: {list(after_modalities.keys())}")
+            print(f"    Change label: {change_label}")
 
-            print(f"  Added {class_count} samples for class {class_label}")
-            total_samples += class_count
-
-        print(f"\nTotal samples found: {total_samples}")
+        print(f"\nTotal temporal samples found: {total_samples}")
 
         if total_samples == 0:
-            print("ERROR: No samples found in the dataset!")
+            print("ERROR: No temporal samples found in the dataset!")
             return [], []
 
-        # Split into train/validation
-        train_data, val_data = [], []
-        for class_label, samples in dataset.items():
-            random.shuffle(samples)
-            split_idx = int(len(samples) * (1 - validation_split))
-            train_data.extend(samples[:split_idx])
-            val_data.extend(samples[split_idx:])
-            print(f"Class {class_label}: {split_idx} train, {len(samples) - split_idx} val")
-
-        print(f"\nFinal split: {len(train_data)} train, {len(val_data)} validation")
+        # Shuffle and split into train/validation
+        random.shuffle(dataset)
+        split_idx = int(len(dataset) * (1 - validation_split))
+        train_data = dataset[:split_idx]
+        val_data = dataset[split_idx:]
+        
+        # Print class distribution
+        train_changes = sum(1 for sample in train_data if sample['change_label'] == 1)
+        val_changes = sum(1 for sample in val_data if sample['change_label'] == 1)
+        
+        print(f"\nTrain split: {len(train_data)} samples")
+        print(f"  Change detected: {train_changes}")
+        print(f"  No change: {len(train_data) - train_changes}")
+        
+        print(f"\nValidation split: {len(val_data)} samples")
+        print(f"  Change detected: {val_changes}")
+        print(f"  No change: {len(val_data) - val_changes}")
+        
         return train_data, val_data
 
     def process_lidar_depth_image(self, lidar_path):
@@ -379,6 +422,92 @@ class MultiModalCorrosionAnalyzer:
                 features['lidar'] = np.zeros(512)
 
         return features
+    
+    def extract_multimodal_features(self, before_paths=None, after_paths=None):
+        """Extract features from before/after modality pairs
+        
+        Args:
+            before_paths: dict with keys {'rgb', 'thermal', 'lidar'} for before timepoint
+            after_paths: dict with keys {'rgb', 'thermal', 'lidar'} for after timepoint
+            
+        Returns:
+            dict: Temporal features for each modality pair
+        """
+        temporal_features = {}
+        
+        print(f"Extracting temporal features...")
+        print(f"Before paths: {list(before_paths.keys()) if before_paths else 'None'}")
+        print(f"After paths: {list(after_paths.keys()) if after_paths else 'None'}")
+        
+        # Extract features for each modality
+        for modality in ['rgb', 'thermal', 'lidar']:
+            before_path = before_paths.get(modality) if before_paths else None
+            after_path = after_paths.get(modality) if after_paths else None
+            
+            print(f"Processing {modality} modality...")
+            
+            # Extract features from before timepoint
+            before_features = self.extract_single_modality_features(
+                modality, before_path
+            ) if before_path else np.zeros(512)
+            
+            # Extract features from after timepoint 
+            after_features = self.extract_single_modality_features(
+                modality, after_path
+            ) if after_path else np.zeros(512)
+            
+            temporal_features[f'{modality}_before'] = before_features
+            temporal_features[f'{modality}_after'] = after_features
+            
+            print(f"  {modality} temporal features extracted")
+            
+        return temporal_features
+    
+    def extract_single_modality_features(self, modality, image_path):
+        """Extract features from a single modality image
+        
+        Args:
+            modality: 'rgb', 'thermal', or 'lidar'
+            image_path: Path to the image file
+            
+        Returns:
+            np.array: Feature vector (512-dim)
+        """
+        if not image_path or not os.path.exists(image_path):
+            return np.zeros(512)
+            
+        try:
+            if modality == 'rgb':
+                image = Image.open(image_path).convert('RGB')
+                tensor = self.rgb_transform(image).unsqueeze(0).to(self.device)
+                
+                with torch.no_grad():
+                    features = self.rgb_extractor(tensor)
+                    embedding = self.rgb_siamese.forward_one(features)
+                    
+            elif modality == 'thermal':
+                image = self.process_thermal_image(image_path)
+                tensor = self.thermal_transform(image).unsqueeze(0).to(self.device)
+                
+                with torch.no_grad():
+                    features = self.thermal_extractor(tensor)
+                    embedding = self.thermal_siamese.forward_one(features)
+                    
+            elif modality == 'lidar':
+                image = self.process_lidar_depth_image(image_path)
+                tensor = self.lidar_transform(image).unsqueeze(0).to(self.device)
+                
+                with torch.no_grad():
+                    features = self.lidar_extractor(tensor)
+                    embedding = self.lidar_siamese.forward_one(features)
+            else:
+                return np.zeros(512)
+                
+            return embedding.cpu().numpy().flatten()
+            
+        except Exception as e:
+            print(f"  Error processing {modality}: {e}")
+            return np.zeros(512)
 
     def visualize_dataset_distribution(self, data_directory, save_path=None):
         """Visualize dataset distribution for paper"""
@@ -836,8 +965,7 @@ class MultiModalCorrosionAnalyzer:
         plt.show()
         return fig
 
-    def create_siamese_pairs(self, dataset, positive_ratio=0.5):
-        """Create positive and negative pairs for Siamese training"""
+        return pairs, labels
         print(f"\nCreating Siamese pairs from {len(dataset)} samples...")
 
         pairs = []
@@ -883,9 +1011,354 @@ class MultiModalCorrosionAnalyzer:
 
         print(f"Created {positive_created} positive pairs and {negative_created} negative pairs")
         return pairs, labels
+    
+    def create_temporal_pairs(self, temporal_dataset, positive_ratio=0.5):
+        """Create temporal pairs for change detection training
+        
+        Args:
+            temporal_dataset: List of temporal samples with before/after data
+            positive_ratio: Ratio of positive (change) pairs to generate
+            
+        Returns:
+            pairs: List of (before_sample, after_sample) tuples
+            labels: List of change labels (0: no change, 1: change detected)
+        """
+        print(f"\nCreating temporal pairs from {len(temporal_dataset)} samples...")
+        
+        pairs = []
+        labels = []
+        
+        # Group samples by change label
+        change_samples = [s for s in temporal_dataset if s['change_label'] == 1]
+        no_change_samples = [s for s in temporal_dataset if s['change_label'] == 0]
+        
+        print(f"Change samples: {len(change_samples)}")
+        print(f"No change samples: {len(no_change_samples)}")
+        
+        # Create pairs directly from temporal samples
+        for sample in temporal_dataset:
+            # Each temporal sample becomes a training pair
+            before_data = {
+                'sample_id': f"{sample['sample_id']}_before",
+                **sample['before']  # Contains RGB, thermal, LIDAR paths
+            }
+            
+            after_data = {
+                'sample_id': f"{sample['sample_id']}_after", 
+                **sample['after']   # Contains RGB, thermal, LIDAR paths
+            }
+            
+            pairs.append((before_data, after_data))
+            labels.append(sample['change_label'])
+            
+        print(f"Created {len(pairs)} temporal pairs")
+        print(f"Change pairs: {sum(labels)}")
+        print(f"No-change pairs: {len(labels) - sum(labels)}")
+        return pairs, labels
 
+        print("Siamese network training completed!")
+        return training_history
+    
+    def train_change_detection(self, data_directory, epochs=100, lr=0.001, batch_size=16):
+        """Train complete change detection system
+        
+        Stage 1: Train Siamese networks on individual modalities
+        Stage 2: Train temporal fusion network for change detection
+        """
+        print("="*50)
+        print("TRAINING CHANGE DETECTION SYSTEM")
+        print("="*50)
+        
+        # Check dataset
+        if not self.check_dataset_structure(data_directory):
+            print("Dataset check failed!")
+            return None
+            
+        # Prepare dataset
+        train_data, val_data = self.prepare_training_dataset(data_directory)
+        
+        if len(train_data) == 0:
+            print("ERROR: No training data found!")
+            return None
+            
+        # Stage 1: Train Siamese Networks
+        print("\nSTAGE 1: Training Siamese Networks...")
+        siamese_results = self.train_siamese_networks_for_temporal(train_data, val_data, epochs, lr, batch_size)
+        
+        if siamese_results is None:
+            print("ERROR: Siamese training failed!")
+            return None
+            
+        # Stage 2: Train Change Detection Classifier
+        print("\nSTAGE 2: Training Change Detection Classifier...")
+        change_detection_results = self.train_change_detection_classifier(
+            train_data, val_data, epochs=50, lr=lr*0.1
+        )
+        
+        if change_detection_results is None:
+            print("ERROR: Change detection training failed!")
+            return None
+            
+        print("\nTemporal change detection training completed!")
+        
+        return {
+            'siamese_results': siamese_results,
+            'change_detection_results': change_detection_results
+        }
+    
+    def train_change_detection_classifier(self, train_data, val_data, epochs=50, lr=0.0001):
+        """Train binary change detection classifier using temporal fusion network"""
+        print(f"\nTraining change detection classifier...")
+        print(f"Training samples: {len(train_data)}")
+        print(f"Validation samples: {len(val_data)}")
+        
+        # Initialize change detection classifier
+        self.change_classifier = nn.Sequential(
+            self.fusion_net,
+            nn.Linear(128, 64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5),
+            nn.Linear(64, 32),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(32, 2)  # Binary: No Change (0) / Change Detected (1)
+        ).to(self.device)
+        
+        optimizer = torch.optim.Adam(self.change_classifier.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
+        
+        # Training history
+        training_history = {
+            'train_losses': [],
+            'val_losses': [],
+            'val_accuracies': [],
+            'best_accuracy': 0.0
+        }
+        
+        print(f"\nStarting change detection training for {epochs} epochs...")
+        
+        for epoch in range(epochs):
+            # Training phase
+            self.change_classifier.train()
+            epoch_loss = 0.0
+            processed_samples = 0
+            
+            random.shuffle(train_data)
+            
+            for sample in train_data:
+                try:
+                    # Extract temporal features using trained Siamese networks
+                    temporal_features = self.extract_multimodal_features(
+                        before_paths=sample['before'],
+                        after_paths=sample['after']
+                    )
+                    
+                    # Prepare feature vector for fusion network
+                    # Order: [RGB_before, Thermal_before, LIDAR_before, RGB_after, Thermal_after, LIDAR_after]
+                    feature_vector = []
+                    for modality in ['rgb', 'thermal', 'lidar']:
+                        # Before features
+                        before_key = f'{modality}_before'
+                        if before_key in temporal_features:
+                            feature_vector.extend(temporal_features[before_key])
+                        else:
+                            feature_vector.extend(np.zeros(512))
+                            
+                        # After features  
+                        after_key = f'{modality}_after'
+                        if after_key in temporal_features:
+                            feature_vector.extend(temporal_features[after_key])
+                        else:
+                            feature_vector.extend(np.zeros(512))
+                    
+                    # Forward pass
+                    features_tensor = torch.FloatTensor(feature_vector).unsqueeze(0).to(self.device)
+                    label_tensor = torch.LongTensor([sample['change_label']]).to(self.device)
+                    
+                    optimizer.zero_grad()
+                    outputs = self.change_classifier(features_tensor)
+                    loss = criterion(outputs, label_tensor)
+                    loss.backward()
+                    optimizer.step()
+                    
+                    epoch_loss += loss.item()
+                    processed_samples += 1
+                    
+                except Exception as e:
+                    print(f"Error processing sample {sample['sample_id']}: {e}")
+                    continue
+            
+            # Validation phase
+            val_accuracy, val_loss = self.evaluate_change_detection(val_data)
+            
+            # Record history
+            avg_train_loss = epoch_loss / max(1, processed_samples)
+            training_history['train_losses'].append(avg_train_loss)
+            training_history['val_losses'].append(val_loss)
+            training_history['val_accuracies'].append(val_accuracy)
+            
+            if val_accuracy > training_history['best_accuracy']:
+                training_history['best_accuracy'] = val_accuracy
+                # Save best model
+                torch.save(self.change_classifier.state_dict(), '/content/best_change_classifier.pth')
+            
+            # Print progress
+            if epoch % 10 == 0 or epoch < 5:
+                print(f"\nEpoch {epoch}/{epochs}:")
+                print(f"  Train Loss: {avg_train_loss:.4f}")
+                print(f"  Val Accuracy: {val_accuracy:.4f}")
+                print(f"  Val Loss: {val_loss:.4f}")
+                print(f"  Best Accuracy: {training_history['best_accuracy']:.4f}")
+                print(f"  Processed Samples: {processed_samples}")
+        
+        print(f"\nChange detection training completed!")
+        print(f"Best validation accuracy: {training_history['best_accuracy']:.4f}")
+        
+        return training_history
+    
+    def evaluate_change_detection(self, val_data):
+        """Evaluate change detection classifier on validation data"""
+        if not val_data or not hasattr(self, 'change_classifier'):
+            return 0.0, 0.0
+            
+        self.change_classifier.eval()
+        correct = 0
+        total = 0
+        total_loss = 0.0
+        criterion = nn.CrossEntropyLoss()
+        
+        with torch.no_grad():
+            for sample in val_data:
+                try:
+                    # Extract temporal features
+                    temporal_features = self.extract_multimodal_features(
+                        before_paths=sample['before'],
+                        after_paths=sample['after']
+                    )
+                    
+                    # Prepare feature vector
+                    feature_vector = []
+                    for modality in ['rgb', 'thermal', 'lidar']:
+                        # Before features
+                        before_key = f'{modality}_before'
+                        if before_key in temporal_features:
+                            feature_vector.extend(temporal_features[before_key])
+                        else:
+                            feature_vector.extend(np.zeros(512))
+                            
+                        # After features
+                        after_key = f'{modality}_after'
+                        if after_key in temporal_features:
+                            feature_vector.extend(temporal_features[after_key])
+                        else:
+                            feature_vector.extend(np.zeros(512))
+                    
+                    # Predict
+                    features_tensor = torch.FloatTensor(feature_vector).unsqueeze(0).to(self.device)
+                    outputs = self.change_classifier(features_tensor)
+                    _, predicted = torch.max(outputs.data, 1)
+                    
+                    # Calculate loss
+                    label_tensor = torch.LongTensor([sample['change_label']]).to(self.device)
+                    loss = criterion(outputs, label_tensor)
+                    total_loss += loss.item()
+                    
+                    total += 1
+                    if predicted.item() == sample['change_label']:
+                        correct += 1
+                        
+                except Exception as e:
+                    continue
+        
+        accuracy = correct / total if total > 0 else 0.0
+        avg_loss = total_loss / total if total > 0 else 0.0
+        
+        return accuracy, avg_loss
+    
+    def predict_temporal_change(self, before_paths=None, after_paths=None):
+        """Predict change between before/after temporal data
+        
+        Args:
+            before_paths: dict with RGB, thermal, LIDAR paths for before timepoint
+            after_paths: dict with RGB, thermal, LIDAR paths for after timepoint
+            
+        Returns:
+            dict: Prediction results with change probability and confidence
+        """
+        try:
+            print("Making temporal change prediction...")
+            
+            if not hasattr(self, 'change_classifier') or self.change_classifier is None:
+                print("ERROR: Change detection classifier not trained!")
+                return None
+            
+            # Extract temporal features
+            temporal_features = self.extract_multimodal_features(
+                before_paths=before_paths,
+                after_paths=after_paths
+            )
+            
+            # Prepare feature vector
+            feature_vector = []
+            modality_status = {}
+            
+            for modality in ['rgb', 'thermal', 'lidar']:
+                # Before features
+                before_key = f'{modality}_before'
+                if before_key in temporal_features:
+                    feature_vector.extend(temporal_features[before_key])
+                    modality_status[f'{modality}_before'] = 'available'
+                else:
+                    feature_vector.extend(np.zeros(512))
+                    modality_status[f'{modality}_before'] = 'missing'
+                    
+                # After features
+                after_key = f'{modality}_after'
+                if after_key in temporal_features:
+                    feature_vector.extend(temporal_features[after_key])
+                    modality_status[f'{modality}_after'] = 'available'
+                else:
+                    feature_vector.extend(np.zeros(512))
+                    modality_status[f'{modality}_after'] = 'missing'
+            
+            print(f"Feature vector length: {len(feature_vector)}")
+            print(f"Modality status: {modality_status}")
+            
+            # Make prediction
+            self.change_classifier.eval()
+            with torch.no_grad():
+                features_tensor = torch.FloatTensor(feature_vector).unsqueeze(0).to(self.device)
+                outputs = self.change_classifier(features_tensor)
+                probabilities = torch.softmax(outputs, dim=1)
+                _, predicted = torch.max(outputs.data, 1)
+            
+            # Format results
+            class_names = ['No Change', 'Change Detected']
+            predicted_class = class_names[predicted.item()]
+            confidence_scores = probabilities.cpu().numpy().flatten()
+            
+            results = {
+                'predicted_class': predicted_class,
+                'predicted_index': predicted.item(),
+                'confidence_scores': {
+                    'No Change': confidence_scores[0],
+                    'Change Detected': confidence_scores[1]
+                },
+                'max_confidence': confidence_scores.max(),
+                'modality_status': modality_status
+            }
+            
+            print(f"Prediction: {predicted_class}")
+            print(f"Confidence: {results['max_confidence']:.4f}")
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error in temporal prediction: {e}")
+            return None
+    
     def train_siamese_networks(self, data_directory, epochs=100, lr=0.001, batch_size=16):
-        """Complete training pipeline with extensive logging"""
+        """Complete training pipeline with extensive logging (legacy compatibility)"""
         print("="*50)
         print("STARTING SIAMESE NETWORK TRAINING")
         print("="*50)
@@ -1005,11 +1478,119 @@ class MultiModalCorrosionAnalyzer:
                 print(f"  Processed {processed_pairs} pairs")
 
                 # Force output in Colab
-                if IN_COLAB:
+                try:
+                    import google.colab
                     import sys
                     sys.stdout.flush()
+                except ImportError:
+                    pass
 
         print("Siamese network training completed!")
+        return training_history
+    
+    def train_siamese_networks_for_temporal(self, train_data, val_data, epochs=100, lr=0.001, batch_size=16):
+        """Train Siamese networks specifically for temporal comparison"""
+        print(f"\nTraining Siamese networks for temporal data...")
+        print(f"Training samples: {len(train_data)}")
+        print(f"Validation samples: {len(val_data)}")
+        
+        # Create temporal pairs for Siamese training
+        train_pairs, train_labels = self.create_temporal_pairs(train_data)
+        val_pairs, val_labels = self.create_temporal_pairs(val_data) if val_data else ([], [])
+        
+        if len(train_pairs) == 0:
+            print("ERROR: No temporal training pairs created!")
+            return None
+            
+        print(f"Training with {len(train_pairs)} temporal pairs")
+        print(f"Validating with {len(val_pairs)} temporal pairs")
+        
+        # Initialize optimizers
+        optimizers = {
+            'rgb': torch.optim.Adam(self.rgb_siamese.parameters(), lr=lr),
+            'thermal': torch.optim.Adam(self.thermal_siamese.parameters(), lr=lr),
+            'lidar': torch.optim.Adam(self.lidar_siamese.parameters(), lr=lr)
+        }
+        
+        criterion = ContrastiveLoss(margin=2.0)
+        
+        # Training history
+        training_history = {
+            'train_losses': [],
+            'val_losses': [],
+            'modality_losses': {'rgb': [], 'thermal': [], 'lidar': []},
+            'learning_rates': []
+        }
+        
+        print(f"\nStarting temporal Siamese training for {epochs} epochs...")
+        
+        for epoch in range(epochs):
+            total_loss = {'rgb': 0, 'thermal': 0, 'lidar': 0}
+            processed_pairs = 0
+            
+            # Training loop
+            for i in range(0, len(train_pairs), batch_size):
+                batch_pairs = train_pairs[i:i+batch_size]
+                batch_labels = train_labels[i:i+batch_size]
+                
+                for pair, label in zip(batch_pairs, batch_labels):
+                    try:
+                        # Extract temporal features
+                        before_features = self.extract_multimodal_features(
+                            before_paths=pair[0], after_paths=None
+                        )
+                        after_features = self.extract_multimodal_features(
+                            before_paths=pair[1], after_paths=None  
+                        )
+                        
+                        # Train each modality Siamese network
+                        for modality in ['rgb', 'thermal', 'lidar']:
+                            before_key = f'{modality}_before'
+                            after_key = f'{modality}_before'  # Using 'before' features from after timepoint
+                            
+                            if before_key in before_features and after_key in after_features:
+                                optimizer = optimizers[modality]
+                                siamese_net = getattr(self, f'{modality}_siamese')
+                                
+                                feat1 = torch.FloatTensor(before_features[before_key]).unsqueeze(0).to(self.device)
+                                feat2 = torch.FloatTensor(after_features[after_key]).unsqueeze(0).to(self.device)
+                                label_tensor = torch.FloatTensor([label]).to(self.device)
+                                
+                                optimizer.zero_grad()
+                                emb1, emb2 = siamese_net(feat1, feat2)
+                                loss = criterion(emb1, emb2, label_tensor)
+                                loss.backward()
+                                optimizer.step()
+                                
+                                total_loss[modality] += loss.item()
+                                
+                        processed_pairs += 1
+                        
+                    except Exception as e:
+                        print(f"Error processing temporal pair {processed_pairs}: {e}")
+                        continue
+            
+            # Calculate average losses
+            if processed_pairs > 0:
+                avg_total_loss = sum(total_loss.values()) / len(total_loss)
+                training_history['train_losses'].append(avg_total_loss)
+                
+                for modality, loss_val in total_loss.items():
+                    avg_loss = loss_val / processed_pairs
+                    training_history['modality_losses'][modality].append(avg_loss)
+                    
+                training_history['learning_rates'].append(lr)
+                
+            # Print progress
+            if epoch % 10 == 0 or epoch < 5:
+                print(f"\nEpoch {epoch}/{epochs}:")
+                for modality, loss_val in total_loss.items():
+                    if processed_pairs > 0:
+                        avg_loss = loss_val / processed_pairs
+                        print(f"  {modality} avg loss: {avg_loss:.4f}")
+                print(f"  Processed {processed_pairs} temporal pairs")
+        
+        print("\nTemporal Siamese networks training completed!")
         return training_history
 
     def save_models(self, save_directory):
@@ -1326,6 +1907,55 @@ class MultiModalCorrosionAnalyzer:
             'siamese_results': siamese_results,
             'fusion_results': fusion_results
         }
+    
+    def complete_temporal_training_pipeline(self, data_directory,
+                                          siamese_epochs=100, change_detection_epochs=50,
+                                          siamese_lr=0.001, change_detection_lr=0.0001,
+                                          save_plots=True):
+        """Complete temporal change detection training pipeline"""
+        print("STARTING COMPLETE TEMPORAL TRAINING PIPELINE")
+        print("="*60)
+        
+        # Visualize dataset distribution
+        print("Creating temporal dataset visualization...")
+        self.visualize_temporal_dataset_distribution(
+            data_directory,
+            save_path='/content/temporal_dataset_distribution.png' if save_plots else None
+        )
+        
+        # Complete temporal training
+        results = self.train_change_detection(
+            data_directory=data_directory,
+            epochs=siamese_epochs,
+            lr=siamese_lr
+        )
+        
+        if results is None:
+            print("ERROR: Temporal training failed!")
+            return None
+            
+        print("✓ Complete temporal training pipeline completed!")
+        
+        # Plot training curves
+        if save_plots:
+            # Plot Siamese results
+            if 'siamese_results' in results:
+                self.plot_training_curves(
+                    results['siamese_results'],
+                    save_path='/content/temporal_siamese_curves.png'
+                )
+            
+            # Plot change detection results
+            if 'change_detection_results' in results:
+                self.plot_training_curves(
+                    results['change_detection_results'],
+                    save_path='/content/change_detection_curves.png'
+                )
+        
+        # Save complete temporal model
+        self.save_temporal_model('/content/temporal_models')
+        
+        return results
 
     def predict_corrosion(self, rgb_path=None, thermal_path=None, lidar_path=None):
         """
@@ -1427,3 +2057,130 @@ class MultiModalCorrosionAnalyzer:
             
         except Exception as e:
             print(f"✗ Error loading complete model: {e}")
+    
+    def visualize_temporal_dataset_distribution(self, data_directory, save_path=None):
+        """Visualize temporal dataset distribution"""
+        print("Creating temporal dataset distribution visualization...")
+        
+        # Count temporal samples
+        change_count = 0
+        no_change_count = 0
+        total_samples = 0
+        
+        for sample_dir in os.listdir(data_directory):
+            sample_path = os.path.join(data_directory, sample_dir)
+            if not os.path.isdir(sample_path):
+                continue
+                
+            label_path = os.path.join(sample_path, 'label.txt')
+            change_label = 0  # Default
+            
+            if os.path.exists(label_path):
+                try:
+                    with open(label_path, 'r') as f:
+                        change_label = int(f.read().strip())
+                except:
+                    pass
+            
+            if change_label == 1:
+                change_count += 1
+            else:
+                no_change_count += 1
+            total_samples += 1
+        
+        if total_samples == 0:
+            print("Warning: No temporal samples found for visualization")
+            return None
+        
+        # Create visualization
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # Bar plot
+        classes = ['No Change', 'Change Detected']
+        counts = [no_change_count, change_count]
+        colors = ['#2E8B57', '#FF6B6B']
+        
+        bars = ax1.bar(classes, counts, color=colors, alpha=0.8)
+        ax1.set_title('Temporal Dataset Distribution', fontweight='bold', fontsize=14)
+        ax1.set_xlabel('Change Status', fontweight='bold')
+        ax1.set_ylabel('Number of Samples', fontweight='bold')
+        
+        # Add value labels
+        for bar, count in zip(bars, counts):
+            height = bar.get_height()
+            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01*max(counts),
+                    f'{count}', ha='center', va='bottom', fontweight='bold')
+        
+        # Pie chart
+        if sum(counts) > 0:
+            wedges, texts, autotexts = ax2.pie(counts, labels=classes, autopct='%1.1f%%',
+                                             colors=colors, startangle=90)
+            ax2.set_title('Change Detection Distribution (%)', fontweight='bold', fontsize=14)
+        
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"Temporal dataset distribution saved to: {save_path}")
+        
+        plt.show()
+        return fig
+    
+    def save_temporal_model(self, save_directory):
+        """Save complete temporal model"""
+        try:
+            os.makedirs(save_directory, exist_ok=True)
+            
+            # Save Siamese networks
+            self.save_models(save_directory)
+            
+            # Save temporal fusion network
+            torch.save(self.fusion_net.state_dict(),
+                      os.path.join(save_directory, 'temporal_fusion_net.pth'))
+            
+            # Save change detection classifier
+            if hasattr(self, 'change_classifier') and self.change_classifier is not None:
+                torch.save(self.change_classifier.state_dict(),
+                          os.path.join(save_directory, 'change_classifier.pth'))
+                print("✓ Change detection classifier saved")
+            
+            print(f"✓ Complete temporal model saved to {save_directory}")
+            
+        except Exception as e:
+            print(f"✗ Error saving temporal model: {e}")
+    
+    def load_temporal_model(self, save_directory):
+        """Load complete temporal model"""
+        try:
+            # Load Siamese networks
+            self.load_models(save_directory)
+            
+            # Load temporal fusion network
+            fusion_path = os.path.join(save_directory, 'temporal_fusion_net.pth')
+            if os.path.exists(fusion_path):
+                self.fusion_net.load_state_dict(torch.load(fusion_path, map_location=self.device))
+                print("✓ Temporal fusion network loaded")
+            
+            # Load change detection classifier
+            classifier_path = os.path.join(save_directory, 'change_classifier.pth')
+            if os.path.exists(classifier_path):
+                # Recreate classifier architecture
+                self.change_classifier = nn.Sequential(
+                    self.fusion_net,
+                    nn.Linear(128, 64),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(0.5),
+                    nn.Linear(64, 32),
+                    nn.ReLU(inplace=True),
+                    nn.Dropout(0.3),
+                    nn.Linear(32, 2)
+                ).to(self.device)
+                
+                self.change_classifier.load_state_dict(torch.load(classifier_path, map_location=self.device))
+                print("✓ Change detection classifier loaded")
+            
+            print("✓ Complete temporal model loaded successfully")
+            
+        except Exception as e:
+            print(f"✗ Error loading temporal model: {e}")
+
