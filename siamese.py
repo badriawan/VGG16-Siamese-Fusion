@@ -12,11 +12,20 @@ class SiameseNetwork(nn.Module):
             nn.Dropout(0.3),
             nn.Linear(256, embedding_dim),
         )
+        self.device = None
 
     def forward_one(self, x):
+        # Ensure input is on the same device as the model
+        if self.device is None:
+            self.device = next(self.parameters()).device
+        
+        if x.device != self.device:
+            x = x.to(self.device)
+            
         output = self.embedding(x)
-        # L2 normalize using functional API
-        return F.normalize(output, p=2, dim=1)
+        # L2 normalize using functional API and ensure output device consistency
+        normalized = F.normalize(output, p=2, dim=1)
+        return normalized.to(self.device)
 
     def forward(self, input1, input2):
         output1 = self.forward_one(input1)

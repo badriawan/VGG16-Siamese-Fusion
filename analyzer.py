@@ -436,9 +436,17 @@ class MultiModalCorrosionAnalyzer:
         temporal_features = {}
         
         print(f"Extracting temporal features...")
-        print(f"Before paths: {list(before_paths.keys()) if before_paths else 'None'}")
-        print(f"After paths: {list(after_paths.keys()) if after_paths else 'None'}")
+        print(f"Before paths: {list(before_paths.keys()) if before_paths and isinstance(before_paths, dict) else before_paths}")
+        print(f"After paths: {list(after_paths.keys()) if after_paths and isinstance(after_paths, dict) else after_paths}")
         
+        # Validate input structure
+        if before_paths and not isinstance(before_paths, dict):
+            print(f"ERROR: before_paths should be dict but got {type(before_paths)}: {before_paths}")
+            return {}
+        if after_paths and not isinstance(after_paths, dict):
+            print(f"ERROR: after_paths should be dict but got {type(after_paths)}: {after_paths}")
+            return {}
+            
         # Extract features for each modality
         for modality in ['rgb', 'thermal', 'lidar']:
             before_path = before_paths.get(modality) if before_paths else None
