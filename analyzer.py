@@ -449,12 +449,12 @@ class MultiModalCorrosionAnalyzer:
             # Extract features from before timepoint
             before_features = self.extract_single_modality_features(
                 modality, before_path
-            ) if before_path else np.zeros(512)
+            ) if before_path else torch.zeros(512).to(self.device)
             
             # Extract features from after timepoint 
             after_features = self.extract_single_modality_features(
                 modality, after_path
-            ) if after_path else np.zeros(512)
+            ) if after_path else torch.zeros(512).to(self.device)
             
             temporal_features[f'{modality}_before'] = before_features
             temporal_features[f'{modality}_after'] = after_features
@@ -471,10 +471,10 @@ class MultiModalCorrosionAnalyzer:
             image_path: Path to the image file
             
         Returns:
-            np.array: Feature vector (512-dim)
+            torch.Tensor: Feature vector (512-dim)
         """
         if not image_path or not os.path.exists(image_path):
-            return np.zeros(512)
+            return torch.zeros(512).to(self.device)
             
         try:
             if modality == 'rgb':
@@ -501,13 +501,13 @@ class MultiModalCorrosionAnalyzer:
                     features = self.lidar_extractor(tensor)
                     embedding = self.lidar_siamese.forward_one(features)
             else:
-                return np.zeros(512)
+                return torch.zeros(512).to(self.device)
                 
-            return embedding.cpu().numpy().flatten()
+            return embedding.squeeze()
             
         except Exception as e:
             print(f"  Error processing {modality}: {e}")
-            return np.zeros(512)
+            return torch.zeros(512).to(self.device)
 
     def visualize_dataset_distribution(self, data_directory, save_path=None):
         """Visualize dataset distribution for paper"""

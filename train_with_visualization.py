@@ -85,16 +85,22 @@ def train_with_live_visualization(data_directory, epochs=50, lr=0.001, batch_siz
                     after_paths=sample['after']
                 )
                 
-                # Prepare input
-                feature_vector = []
+                # Prepare input tensor
+                feature_tensors = []
                 for modality in ['rgb', 'thermal', 'lidar']:
-                    feature_vector.extend([
-                        temporal_features[f'{modality}_before'],
-                        temporal_features[f'{modality}_after']
-                    ])
+                    before_feat = temporal_features[f'{modality}_before']
+                    after_feat = temporal_features[f'{modality}_after']
+                    
+                    # Ensure tensors are on the correct device
+                    if not isinstance(before_feat, torch.Tensor):
+                        before_feat = torch.tensor(before_feat, device=analyzer.device)
+                    if not isinstance(after_feat, torch.Tensor):
+                        after_feat = torch.tensor(after_feat, device=analyzer.device)
+                        
+                    feature_tensors.extend([before_feat, after_feat])
                 
-                # Convert to tensor
-                features_tensor = torch.cat(feature_vector).unsqueeze(0).to(analyzer.device)
+                # Concatenate all features
+                features_tensor = torch.cat(feature_tensors).unsqueeze(0)
                 label_tensor = torch.tensor([sample['change_label']], dtype=torch.long).to(analyzer.device)
                 
                 # Forward pass
@@ -131,15 +137,21 @@ def train_with_live_visualization(data_directory, epochs=50, lr=0.001, batch_siz
                         after_paths=sample['after']
                     )
                     
-                    # Prepare input
-                    feature_vector = []
+                    # Prepare input tensor
+                    feature_tensors = []
                     for modality in ['rgb', 'thermal', 'lidar']:
-                        feature_vector.extend([
-                            temporal_features[f'{modality}_before'],
-                            temporal_features[f'{modality}_after']
-                        ])
+                        before_feat = temporal_features[f'{modality}_before']
+                        after_feat = temporal_features[f'{modality}_after']
+                        
+                        # Ensure tensors are on the correct device
+                        if not isinstance(before_feat, torch.Tensor):
+                            before_feat = torch.tensor(before_feat, device=analyzer.device)
+                        if not isinstance(after_feat, torch.Tensor):
+                            after_feat = torch.tensor(after_feat, device=analyzer.device)
+                            
+                        feature_tensors.extend([before_feat, after_feat])
                     
-                    features_tensor = torch.cat(feature_vector).unsqueeze(0).to(analyzer.device)
+                    features_tensor = torch.cat(feature_tensors).unsqueeze(0)
                     label_tensor = torch.tensor([sample['change_label']], dtype=torch.long).to(analyzer.device)
                     
                     # Forward pass

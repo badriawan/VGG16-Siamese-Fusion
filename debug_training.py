@@ -204,14 +204,20 @@ def simple_training_test(data_directory, epochs=5):
                 )
                 
                 # Prepare input tensor
-                feature_vector = []
+                feature_tensors = []
                 for modality in ['rgb', 'thermal', 'lidar']:
-                    feature_vector.extend([
-                        features[f'{modality}_before'],
-                        features[f'{modality}_after']
-                    ])
+                    before_feat = features[f'{modality}_before']
+                    after_feat = features[f'{modality}_after']
+                    
+                    # Ensure tensors are on the correct device
+                    if not isinstance(before_feat, torch.Tensor):
+                        before_feat = torch.tensor(before_feat, device=analyzer.device)
+                    if not isinstance(after_feat, torch.Tensor):
+                        after_feat = torch.tensor(after_feat, device=analyzer.device)
+                        
+                    feature_tensors.extend([before_feat, after_feat])
                 
-                features_tensor = torch.cat(feature_vector).unsqueeze(0).to(analyzer.device)
+                features_tensor = torch.cat(feature_tensors).unsqueeze(0)
                 label_tensor = torch.tensor([sample['change_label']], dtype=torch.long).to(analyzer.device)
                 
                 print(f"    Features shape: {features_tensor.shape}")
