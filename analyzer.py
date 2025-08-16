@@ -104,7 +104,7 @@ class MultiModalCorrosionAnalyzer:
             nn.Linear(512, 256),
             nn.ReLU(inplace=True),
             nn.Linear(256, 128)  # Final temporal embedding
-        )
+        ).to(self.device)
 
     def check_dataset_structure(self, data_directory):
         """Check and print dataset structure"""
@@ -439,13 +439,20 @@ class MultiModalCorrosionAnalyzer:
         print(f"Before paths: {list(before_paths.keys()) if before_paths and isinstance(before_paths, dict) else before_paths}")
         print(f"After paths: {list(after_paths.keys()) if after_paths and isinstance(after_paths, dict) else after_paths}")
         
-        # Validate input structure
+        # Validate input structure and filter out non-modality keys
         if before_paths and not isinstance(before_paths, dict):
             print(f"ERROR: before_paths should be dict but got {type(before_paths)}: {before_paths}")
             return {}
         if after_paths and not isinstance(after_paths, dict):
             print(f"ERROR: after_paths should be dict but got {type(after_paths)}: {after_paths}")
             return {}
+        
+        # Filter out non-modality keys (like sample_id, _sample_id, etc.)
+        valid_modalities = {'rgb', 'thermal', 'lidar'}
+        if before_paths:
+            before_paths = {k: v for k, v in before_paths.items() if k in valid_modalities}
+        if after_paths:
+            after_paths = {k: v for k, v in after_paths.items() if k in valid_modalities}
             
         # Extract features for each modality
         for modality in ['rgb', 'thermal', 'lidar']:
@@ -1046,15 +1053,13 @@ class MultiModalCorrosionAnalyzer:
         # Create pairs directly from temporal samples
         for sample in temporal_dataset:
             # Each temporal sample becomes a training pair
-            before_data = {
-                'sample_id': f"{sample['sample_id']}_before",
-                **sample['before']  # Contains RGB, thermal, LIDAR paths
-            }
+            # Keep modality paths separate from sample_id to avoid confusion
+            before_data = sample['before'].copy()  # Only modality paths
+            after_data = sample['after'].copy()    # Only modality paths
             
-            after_data = {
-                'sample_id': f"{sample['sample_id']}_after", 
-                **sample['after']   # Contains RGB, thermal, LIDAR paths
-            }
+            # Add metadata separately if needed
+            before_data['_sample_id'] = f"{sample['sample_id']}_before"
+            after_data['_sample_id'] = f"{sample['sample_id']}_after"
             
             pairs.append((before_data, after_data))
             labels.append(sample['change_label'])
