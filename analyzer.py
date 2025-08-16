@@ -503,7 +503,7 @@ class MultiModalCorrosionAnalyzer:
             else:
                 return torch.zeros(512).to(self.device)
                 
-            return embedding.squeeze()
+            return embedding.squeeze().to(self.device)
             
         except Exception as e:
             print(f"  Error processing {modality}: {e}")

@@ -322,14 +322,18 @@ def plot_final_results(results):
     plt.subplot(2, 3, 4)
     if len(history['val_accuracies']) > 1:
         improvement = np.diff([0] + history['val_accuracies'])
-        epochs_diff = epochs[1:len(improvement)+1]  # Match array lengths
-        plt.plot(epochs_diff, improvement, linewidth=2, color='purple', label='Accuracy Improvement')
-        plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        plt.title('Accuracy Improvement per Epoch')
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy Change')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
+        epochs_diff = np.array(epochs[1:])[:len(improvement)]  # Match array lengths exactly
+        if len(epochs_diff) == len(improvement):
+            plt.plot(epochs_diff, improvement, linewidth=2, color='purple', label='Accuracy Improvement')
+            plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+            plt.title('Accuracy Improvement per Epoch')
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy Change')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+        else:
+            plt.text(0.5, 0.5, f'Array mismatch:\nepochs {len(epochs_diff)}\nimprovement {len(improvement)}', 
+                    ha='center', va='center', transform=plt.gca().transAxes)
     else:
         plt.text(0.5, 0.5, 'Insufficient data\nfor improvement plot', 
                 ha='center', va='center', transform=plt.gca().transAxes)
