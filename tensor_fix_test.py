@@ -3,7 +3,7 @@ import torch
 import os
 from analyzer import MultiModalCorrosionAnalyzer
 
-def test_tensor_fixes(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset"):
+def test_tensor_fixes(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"):
     """
     Test the tensor conversion fixes
     """
@@ -94,7 +94,7 @@ def test_tensor_fixes(data_directory="/content/drive/MyDrive/Colab Notebooks/tem
         traceback.print_exc()
         return False
 
-def test_training_one_epoch(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset"):
+def test_training_one_epoch(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"):
     """
     Test training for one epoch to verify fixes
     """

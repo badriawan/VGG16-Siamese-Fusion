@@ -4,7 +4,7 @@ import torch.nn as nn
 import os
 from analyzer import MultiModalCorrosionAnalyzer
 
-def debug_full_pipeline(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset"):
+def debug_full_pipeline(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"):
     """
     Complete pipeline debugging with detailed logging
     """
@@ -255,7 +255,7 @@ def debug_full_pipeline(data_directory="/content/drive/MyDrive/Colab Notebooks/t
     
     return True
 
-def minimal_training_test(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset", epochs=3):
+def minimal_training_test(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset", epochs=3):
     """
     Minimal training test with all fixes applied
     """

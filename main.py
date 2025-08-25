@@ -132,7 +132,7 @@ def visualize_dataset():
         analyzer = MultiModalCorrosionAnalyzer()
         
         # Data directory for temporal dataset structure
-        data_directory = "/content/drive/MyDrive/Colab Notebooks/temporal_dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         
         print(f"\nExpected dataset structure:")
         print("temporal_dataset/")
@@ -188,7 +188,7 @@ def train_change_detection():
         analyzer = MultiModalCorrosionAnalyzer()
         
         # Data directory for temporal dataset structure
-        data_directory = "/content/drive/MyDrive/Colab Notebooks/temporal_dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         
         print(f"\nExpected dataset structure:")
         print("temporal_dataset/")
@@ -260,7 +260,7 @@ def test_system():
                 print(f"✗ Method {method} missing")
         
         # Test dataset structure check
-        data_directory = "/content/drive/MyDrive/Colab Notebooks/temporal_dataset"
+        data_directory = "/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"
         if os.path.exists(data_directory):
             print("✓ Dataset directory found")
             

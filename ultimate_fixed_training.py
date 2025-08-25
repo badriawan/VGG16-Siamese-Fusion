@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from analyzer import MultiModalCorrosionAnalyzer
 
-def ultimate_training_solution(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset", 
+def ultimate_training_solution(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset", 
                              epochs=20, lr=0.001):
     """
     Ultimate training solution with all critical fixes applied
@@ -341,7 +341,7 @@ def plot_ultimate_results(results):
     print(f"📊 Results plot saved to: /content/ultimate_training_results.png")
 
 # Main execution function
-def run_ultimate_solution(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset", 
+def run_ultimate_solution(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset", 
                          epochs=25, lr=0.001):
     """
     Run the ultimate training solution
