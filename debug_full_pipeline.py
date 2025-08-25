@@ -143,7 +143,8 @@ def debug_full_pipeline(data_directory="/content/drive/MyDrive/S3 UTP/MS2_datase
         thermal_optimizer = torch.optim.Adam(analyzer.thermal_siamese.parameters(), lr=0.001)
         lidar_optimizer = torch.optim.Adam(analyzer.lidar_siamese.parameters(), lr=0.001)
         
-        criterion = nn.ContrastiveLoss(margin=1.0)
+        from loss import ContrastiveLoss
+        criterion = ContrastiveLoss(margin=1.0)
         
         # Process one pair
         pair = train_pairs[0]
