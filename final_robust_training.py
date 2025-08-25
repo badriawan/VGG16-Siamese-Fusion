@@ -441,7 +441,7 @@ def plot_robust_results(results):
     plt.show()
 
 # Easy usage function
-def run_final_robust_training(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset", 
+def run_final_robust_training(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset", 
                              epochs=20, lr=0.001):
     """Run the final robust training with all fixes"""
     print("🚀 Starting final robust training with comprehensive fixes...")
@@ -473,7 +473,7 @@ def run_final_robust_training(data_directory="/content/drive/MyDrive/S3 UTP/MS2_
         return None
 
 # Debug helper
-def quick_data_check(data_directory="/content/drive/MyDrive/S3 UTP/MS2_dataset/temporal_dataset"):
+def quick_data_check(data_directory="/content/drive/MyDrive/Colab Notebooks/temporal_dataset"):
     """Quick data structure check"""
     print("Quick data structure check...")
     
